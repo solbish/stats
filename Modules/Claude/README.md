@@ -2,7 +2,7 @@
 
 Monitor your Claude AI usage directly from the macOS menu bar.
 
-![Claude Module Preview](screenshots/preview.png)
+![Claude Module Preview](screenshots/preview.jpg)
 
 ## Features
 
@@ -16,12 +16,12 @@ Monitor your Claude AI usage directly from the macOS menu bar.
 ## Screenshots
 
 ### Menu Bar Widget
-![Menu Bar](screenshots/menubar.png)
+![Menu Bar](screenshots/menubar.jpg)
 
 The Claude module displays in your menu bar showing current 5-hour utilization.
 
 ### Popup View
-![Popup](screenshots/popup.png)
+![Popup](screenshots/popup.jpg)
 
 Click the menu bar icon to see detailed usage information:
 - 5-hour and 7-day usage bars with percentages
@@ -32,7 +32,7 @@ Click the menu bar icon to see detailed usage information:
 - Best time recommendations
 
 ### Settings
-![Settings](screenshots/settings.png)
+![Settings](screenshots/settings.jpg)
 
 Configure authentication and update intervals.
 
@@ -192,4 +192,4 @@ Increase the update interval in settings to reduce API calls.
 
 ## Feedback
 
-Report issues or request features at: https://github.com/vanooo/stats/issues
+Report issues or request features at: https://github.com/solbish/stats/issues

@@ -51,8 +51,8 @@ Stats is an application that allows you to monitor your macOS system.
 Monitor your Claude AI usage directly from the menu bar.
 
 <p align="center">
-  <img src="Modules/Claude/screenshots/popup.png" height="240" alt="Claude Popup">
-  <img src="Modules/Claude/screenshots/settings.png" height="240" alt="Claude Settings">
+  <img src="Modules/Claude/screenshots/popup.jpg" height="240" alt="Claude Popup">
+  <img src="Modules/Claude/screenshots/settings.jpg" height="240" alt="Claude Settings">
 </p>
 
 ### Features
