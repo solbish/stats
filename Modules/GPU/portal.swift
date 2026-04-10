@@ -13,7 +13,7 @@ import Cocoa
 import Kit
 
 public class Portal: PortalWrapper {
-    private var circle: HalfCircleGraphView? = nil
+    private var circle: PieChartView? = nil
     
     private var usageField: NSTextField? = nil
     private var renderField: NSTextField? = nil
@@ -56,7 +56,7 @@ public class Portal: PortalWrapper {
             right: Constants.Popup.spacing*4
         )
         
-        let chart = HalfCircleGraphView()
+        let chart = PieChartView(frame: NSRect.zero, segments: [], drawValue: true)
         chart.toolTip = localizedString("GPU usage")
         view.addArrangedSubview(chart)
         self.circle = chart

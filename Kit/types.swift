@@ -415,6 +415,14 @@ public enum RAMPressure: String, Codable {
             return NSColor.systemRed
         }
     }
+
+    public func number() -> Int {
+        switch self {
+        case .normal: return 0
+        case .warning: return 1
+        case .critical: return 2
+        }
+    }
 }
 
 public struct TokenResponse: Codable {

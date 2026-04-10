@@ -74,8 +74,8 @@ public class Claude: Module {
                 widget.setValue([[ColorValue(value.fiveHourUtil / 100)], [ColorValue(value.sevenDayUtil / 100)]])
             case let widget as PieChart:
                 widget.setValue([
-                    circle_segment(value: value.fiveHourUtil / 100, color: NSColor.systemOrange),
-                    circle_segment(value: (100 - value.fiveHourUtil) / 100, color: NSColor.systemGreen)
+                    ColorValue(value.fiveHourUtil / 100, color: NSColor.systemOrange),
+                    ColorValue((100 - value.fiveHourUtil) / 100, color: NSColor.systemGreen)
                 ])
             default: break
             }

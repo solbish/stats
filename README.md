@@ -8,39 +8,81 @@
 macOS system monitor in your menu bar
 
 ## Installation
+
 ### Manual
+
 You can download the latest version [here](https://github.com/exelban/stats/releases/latest/download/Stats.dmg).
 This will download a file called `Stats.dmg`. Open it and move the app to the application folder.
 
 ### Homebrew
+
 To install it using Homebrew, open the Terminal app and type:
+
 ```bash
 brew install stats
 ```
 
 ### Legacy version
+
 Legacy version for older systems could be found [here](https://mac-stats.com/downloads).
 
 ## Requirements
+
 Stats is supported on the released macOS version starting from macOS 11.15 (Big Sur).
 
 ## Features
+
 Stats is an application that allows you to monitor your macOS system.
 
- - CPU utilization
- - GPU utilization
- - Memory usage
- - Disk utilization
- - Network usage
- - Battery level
- - Fan's control (not maintained)
- - Sensors information (Temperature/Voltage/Power)
- - Bluetooth devices
- - Multiple time zone clock
+- CPU utilization
+- GPU utilization
+- Memory usage
+- Disk utilization
+- Network usage
+- Battery level
+- Fan's control (not maintained)
+- Sensors information (Temperature/Voltage/Power)
+- Bluetooth devices
+- Multiple time zone clock
+- **[Claude AI Usage Monitor](#claude-module)** - Track your Claude API usage limits
+
+## Claude Module
+
+Monitor your Claude AI usage directly from the menu bar.
+
+<p align="center">
+  <img src="Modules/Claude/screenshots/popup.png" height="240" alt="Claude Popup">
+  <img src="Modules/Claude/screenshots/settings.png" height="240" alt="Claude Settings">
+</p>
+
+### Features
+
+- **5-Hour & 7-Day Usage** - Real-time tracking with progress bars and reset countdowns
+- **24-Hour History** - Visualize your usage patterns
+- **Peak Hours** - Know when Claude is busiest (8 AM - 2 PM ET weekdays)
+- **Best Time Analysis** - Find optimal times based on your history
+
+### Quick Setup
+
+**Option 1: Web Cookies (Recommended)**
+
+1. Install "Cookies Extractor" Chrome extension
+2. Go to [claude.ai](https://claude.ai) and log in
+3. Click extension > "Copy as JSON Cookie"
+4. Stats > Settings > Claude > "Import from Clipboard"
+
+**Option 2: Claude Code CLI**
+
+1. Install: `npm install -g @anthropic-ai/claude-code`
+2. Login: `claude login`
+3. Stats > Settings > Claude > "Import from Keychain"
+
+[Full documentation](Modules/Claude/README.md)
 
 ## FAQs
 
 ### How do you change the order of the menu bar icons?
+
 macOS decides the order of the menu bar items not `Stats` - it may change after the first reboot after installing Stats.
 
 To change the order of any menu bar icon - macOS Mojave (version 10.14) and up.
@@ -50,24 +92,30 @@ To change the order of any menu bar icon - macOS Mojave (version 10.14) and up.
 3. Release ⌘ (command key)
 
 ### How to reduce energy impact or CPU usage of Stats?
+
 Stats tries to be efficient as it's possible. But reading some data periodically is not a cheap task. Each module has its own "price". So, if you want to reduce energy impact from the Stats you need to disable some Stats modules. The most inefficient modules are Sensors and Bluetooth. Disabling these modules could reduce CPU usage and power efficiency by up to 50% in some cases.
 
 ### Fan control
+
 Fan control is in legacy mode. It does not receive any updates or fixes. It's not dropped from the app just because in the old Macs it works pretty acceptable. I'm open to accepting fixed or improvements (via PR) for this feature in case someone would like to help with that. But have no option and time to provide support for this feature.
 
 ### Sensors show incorrect CPU/GPU core count
+
 CPU/GPU sensors are simply thermal zones (sensors) on the CPU/GPU. They have no relation to the number of cores or specific cores.
 For example, a CPU is typically divided into two clusters: efficiency and performance. Each cluster contains multiple temperature sensors, and Stats simply displays these sensors. However, "CPU Efficient Core 1" does not represent the temperature of a single efficient core—it only indicates one of the temperature sensors within the efficiency core cluster.
 Additionally, with each new SoC, Apple changes the sensor keys. As a result, it takes time to determine which SMC values correspond to the appropriate sensors. If anyone knows how to accurately match the sensors for Apple Silicon, please contact me.
 
 ### App crash – what to do?
+
 First, ensure that you are using the latest version of Stats. There is a high chance that a fix preventing the crash has already been released. If you are already running the latest version, check the open issues. Only if none of the existing issues address your problem should you open a new issue.
 
 ### Why my issue was closed without any response?
+
 Most probably because it's a duplicated issue and there is an answer to the question, report, or proposition. Please use a search by closed issues to get an answer.
 So, if your issue was closed without any response, most probably it already has a response.
 
 ### External API
+
 Stats uses some external APIs, such as:
 
 - https://api.mac-stats.com – For update checks and retrieving the public IP address
@@ -80,8 +128,8 @@ If you have concerns about these requests, you have a few options:
 - propose a PR that allows these features to work without an external server
 - block both of these servers using any network filtering app (if you're reading this, you're likely using something like Little Snitch, so you can easily do this). In this case do not expect to receive any updates or see your public IP in the network module.
 
-
 ## Supported languages
+
 - English
 - Polski
 - Українська
@@ -121,4 +169,5 @@ If you have concerns about these requests, you have a few options:
 You can help by adding a new language or improving the existing translation.
 
 ## License
+
 [MIT License](https://github.com/exelban/stats/blob/master/LICENSE)
