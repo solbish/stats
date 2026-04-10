@@ -1,9 +1,9 @@
 # Stats
 
-<a href="https://github.com/exelban/stats/releases"><p align="center"><img src="https://github.com/exelban/stats/raw/master/Stats/Supporting%20Files/Assets.xcassets/AppIcon.appiconset/icon_256x256.png" width="120"></p></a>
+<a href="https://github.com/solbish/stats/releases"><p align="center"><img src="https://github.com/solbish/stats/raw/master/Stats/Supporting%20Files/Assets.xcassets/AppIcon.appiconset/icon_256x256.png" width="120"></p></a>
 
-[![Stats](https://serhiy.s3.eu-central-1.amazonaws.com/Github_repo/stats/menus%3Fv2.3.2.png?v1)](https://github.com/exelban/stats/releases)
-[![Stats](https://serhiy.s3.eu-central-1.amazonaws.com/Github_repo/stats/popups%3Fv2.3.2.png?v3)](https://github.com/exelban/stats/releases)
+[![Stats](https://serhiy.s3.eu-central-1.amazonaws.com/Github_repo/stats/menus%3Fv2.3.2.png?v1)](https://github.com/solbish/stats/releases)
+[![Stats](https://serhiy.s3.eu-central-1.amazonaws.com/Github_repo/stats/popups%3Fv2.3.2.png?v3)](https://github.com/solbish/stats/releases)
 
 macOS system monitor in your menu bar
 
@@ -11,7 +11,7 @@ macOS system monitor in your menu bar
 
 ### Manual
 
-You can download the latest version [here](https://github.com/exelban/stats/releases/latest/download/Stats.dmg).
+You can download the latest version [here](https://github.com/solbish/stats/releases/latest/download/Stats.dmg).
 This will download a file called `Stats.dmg`. Open it and move the app to the application folder.
 
 ### Homebrew
@@ -50,10 +50,11 @@ Stats is an application that allows you to monitor your macOS system.
 
 Monitor your Claude AI usage directly from the menu bar.
 
-<p align="center">
-  <img src="Modules/Claude/screenshots/popup.jpg" height="240" alt="Claude Popup">
-  <img src="Modules/Claude/screenshots/settings.jpg" height="240" alt="Claude Settings">
-</p>
+<a href="https://github.com/solbish/stats/releases">
+  <p align="center">
+    <img src="Modules/Claude/screenshots/popup.jpg" width="120" alt="Claude Popup">
+  </p>
+</a>
 
 ### Features
 
@@ -170,4 +171,4 @@ You can help by adding a new language or improving the existing translation.
 
 ## License
 
-[MIT License](https://github.com/exelban/stats/blob/master/LICENSE)
+[MIT License](https://github.com/solbish/stats/blob/master/LICENSE)
