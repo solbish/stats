@@ -57,7 +57,7 @@ public class Portal: PortalWrapper {
             right: Constants.Popup.spacing*4
         )
         
-        let chart = PieChartView(openCircle: true)
+let chart = PieChartView(openCircle: true)
         chart.toolTip = localizedString("GPU usage")
         view.addArrangedSubview(chart)
         self.circle = chart
