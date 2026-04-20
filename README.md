@@ -114,6 +114,12 @@ Click the menu bar icon to see detailed usage information:
 - Peak hours status
 - Best time recommendations
 
+### Peak Hours Visualization
+
+![Peak Hours](Modules/Claude/screenshots/peak-hours.jpg)
+
+The 24-hour history chart highlights peak hours (8 AM - 2 PM ET weekdays) as shaded areas. The status bar shows current off-peak/peak state with a countdown timer to the next change.
+
 ### Settings
 
 ![Settings](Modules/Claude/screenshots/settings.jpg)
