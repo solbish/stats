@@ -109,7 +109,7 @@ internal class Settings: NSStackView, Settings_v {
         instructions.textColor = NSColor.secondaryLabelColor
         instructions.preferredMaxLayoutWidth = 280
 
-        self.authSection = PreferencesSection(label: "Claude Code (fallback)", [
+        self.authSection = PreferencesSection(title: "Claude Code (fallback)", [
             PreferencesRow("Status", component: self.codeStatusLabel!),
             PreferencesRow(component: importBtn),
             PreferencesRow(component: clearBtn),
@@ -181,7 +181,7 @@ internal class Settings: NSStackView, Settings_v {
         instructions.textColor = NSColor.secondaryLabelColor
         instructions.preferredMaxLayoutWidth = 280
 
-        self.webSection = PreferencesSection(label: "Claude.ai Web", [
+        self.webSection = PreferencesSection(title: "Claude.ai Web", [
             PreferencesRow("Status", component: self.webStatusLabel!),
             PreferencesRow(component: importBtn),
             PreferencesRow("Session Key", component: self.sessionKeyDisplay!),
