@@ -12,25 +12,6 @@
 import Cocoa
 import Kit
 
-private struct Sensor_t: KeyValue_p {
-    let key: String
-    let name: String?
-    
-    var value: String
-    var additional: Any?
-    
-    var index: Int {
-        get { Store.shared.int(key: "sensors_\(self.key)_index", defaultValue: -1) }
-        set { Store.shared.set(key: "sensors_\(self.key)_index", value: newValue) }
-    }
-    
-    init(key: String, value: String, name: String? = nil) {
-        self.key = key
-        self.value = value
-        self.name = name
-    }
-}
-
 internal class Popup: PopupWrapper {
     private var list: [String: NSView] = [:]
     
@@ -39,6 +20,7 @@ internal class Popup: PopupWrapper {
     
     private var sensors: [Sensor_p] = []
     private let settingsView: NSStackView = NSStackView()
+    private let sensorsCache = PopupCache<[Sensor_p]>()
     
     private var fanControlState: Bool {
         get { Store.shared.bool(key: "Sensors_fanControl", defaultValue: true) }
@@ -159,7 +141,7 @@ internal class Popup: PopupWrapper {
             }
             
             if !reload {
-                let section = PreferencesSection(label: localizedString(typ.rawValue))
+                let section = PreferencesSection(title: localizedString(typ.rawValue))
                 section.identifier = NSUserInterfaceItemIdentifier("sensor")
                 groups.forEach { (group: SensorGroup) in
                     filtered.filter{ $0.group == group }.forEach { (s: Sensor_p) in
@@ -204,21 +186,27 @@ internal class Popup: PopupWrapper {
                 }
             }
             
-            if self.window?.isVisible ?? false {
-                values.forEach { (s: Sensor_p) in
-                    switch self.list[s.key] {
-                    case let fan as FanView:
-                        if let f = s as? Fan {
-                            fan.update(f)
-                        }
-                    case let sensor as SensorView:
-                        sensor.update(s)
-                    case .none, .some:
-                        break
-                    }
-                }
-            }
+            self.sensorsCache.apply(values, visible: self.window?.isVisible ?? false, render: self.renderSensors)
         })
+    }
+    
+    private func renderSensors(_ values: [Sensor_p]) {
+        values.forEach { (s: Sensor_p) in
+            switch self.list[s.key] {
+            case let fan as FanView:
+                if let f = s as? Fan {
+                    fan.update(f)
+                }
+            case let sensor as SensorView:
+                sensor.update(s)
+            case .none, .some:
+                break
+            }
+        }
+    }
+    
+    public override func appear() {
+        self.replay(self.sensorsCache, render: self.renderSensors)
     }
     
     private func recalculateHeight() {
@@ -245,40 +233,25 @@ internal class Popup: PopupWrapper {
     // MARK: helpers
     
     private func fansSeparatorView() -> NSView {
-        let view: NSStackView = NSStackView(frame: NSRect(x: 0, y: 0, width: self.frame.width, height: 26))
-        view.widthAnchor.constraint(equalToConstant: view.frame.width).isActive = true
-        view.heightAnchor.constraint(equalToConstant: view.bounds.height).isActive = true
-        view.orientation = .horizontal
-        view.spacing = 0
-        view.distribution = .fillEqually
-        view.alignment = .top
+        let row: NSView = NSView(frame: NSRect(x: 0, y: 0, width: self.frame.width, height: Constants.Popup.separatorHeight))
+        row.widthAnchor.constraint(equalToConstant: row.frame.width).isActive = true
+        row.heightAnchor.constraint(equalToConstant: row.bounds.height).isActive = true
         
-        let labelView: NSTextField = TextView()
-        labelView.stringValue = localizedString("Fans")
-        labelView.alignment = .center
-        labelView.textColor = .secondaryLabelColor
-        labelView.font = NSFont.systemFont(ofSize: 12, weight: .medium)
-        
-        let btnContainer = NSView()
-        
-        let button = NSButton()
-        button.frame = CGRect(x: (self.frame.width/3)-20, y: 10, width: 15, height: 15)
+        let button = NSButtonWithPadding()
+        button.frame = CGRect(x: row.frame.width - 18, y: 6, width: 18, height: 18)
         button.bezelStyle = .regularSquare
         button.isBordered = false
-        button.imageScaling = NSImageScaling.scaleAxesIndependently
+        button.imageScaling = NSImageScaling.scaleProportionallyDown
         button.contentTintColor = .lightGray
         button.action = #selector(self.toggleFanControl)
         button.target = self
         button.toolTip = localizedString("Control")
-        button.image = Bundle(for: Module.self).image(forResource: "tune")!
+        button.image = iconFromSymbol(name: "slider.horizontal.3", scale: .medium)
         
-        btnContainer.addSubview(button)
+        row.addSubview(separatorView(localizedString("Fans"), width: self.frame.width, rightInset: 24))
+        row.addSubview(button)
         
-        view.addArrangedSubview(NSView())
-        view.addArrangedSubview(labelView)
-        view.addArrangedSubview(btnContainer)
-        
-        return view
+        return row
     }
     
     @objc private func toggleSensor(_ sender: NSControl) {
@@ -430,8 +403,10 @@ internal class ValueSensorView: NSStackView {
 
 internal class ChartSensorView: NSStackView {
     private var chart: LineChartView? = nil
-    
+    private var currentSuffix: String
+
     public init(width: CGFloat, suffix: String) {
+        self.currentSuffix = suffix
         super.init(frame: NSRect(x: 0, y: 0, width: width, height: 60))
         
         self.wantsLayer = true
@@ -442,7 +417,7 @@ internal class ChartSensorView: NSStackView {
         self.layer?.cornerRadius = 3
         
         self.chart = LineChartView(frame: NSRect(x: 0, y: 0, width: self.frame.width, height: self.frame.height), num: 120, scale: .linear)
-        self.chart?.suffix = suffix
+        self.chart?.setSuffix(suffix)
         
         if let view = self.chart {
             self.addArrangedSubview(view)
@@ -459,10 +434,12 @@ internal class ChartSensorView: NSStackView {
     }
     
     public func update(_ value: Double, _ suffix: String) {
-        if self.chart?.suffix != suffix {
-            self.chart?.suffix = suffix
+        guard let chart = self.chart else { return }
+        if self.currentSuffix != suffix {
+            self.currentSuffix = suffix
+            chart.setSuffix(suffix)
         }
-        self.chart?.addValue(value/100)
+        chart.addValue(value/100)
     }
 }
 
@@ -535,7 +512,7 @@ internal class FanView: NSStackView {
         self.spacing = 1
         self.edgeInsets = NSEdgeInsets(top: inset, left: inset, bottom: inset, right: inset)
         self.wantsLayer = true
-        self.layer?.cornerRadius = 2
+        self.layer?.cornerRadius = Constants.Popup.radius
         
         self.nameAndSpeed()
         self.setupControls()
@@ -550,9 +527,9 @@ internal class FanView: NSStackView {
             SMCHelper.shared.setFanMode(fan.id, mode: fanMode.rawValue)
             self.modeButtons?.setMode(FanMode(rawValue: fanMode.rawValue) ?? .automatic)
             
-            self.setSpeed(value: Int(self.speed), then: {
-                DispatchQueue.main.async {
-                    self.sliderValueField?.textColor = .systemBlue
+            self.setSpeed(value: Int(self.speed), then: { [weak self] in
+                DispatchQueue.main.async { [weak self] in
+                    self?.sliderValueField?.textColor = .systemBlue
                 }
             })
         }
@@ -566,7 +543,7 @@ internal class FanView: NSStackView {
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         NotificationCenter.default.removeObserver(self, name: .syncFansControl, object: nil)
         NotificationCenter.default.removeObserver(self, name: .fanHelperState, object: nil)
-        NotificationCenter.default.removeObserver(self, name: .toggleSettings, object: nil)
+        NotificationCenter.default.removeObserver(self, name: .toggleFanControl, object: nil)
     }
     
     override func updateLayer() {
@@ -842,13 +819,14 @@ internal class FanView: NSStackView {
         
         if self.speedState {
             if let mode = self.willSleepMode, let speed = self.willSleepSpeed {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+                    guard let self else { return }
                     SMCHelper.shared.setFanMode(self.fan.id, mode: mode.rawValue)
                     self.modeButtons?.setMode(mode)
                     if !mode.isAutomatic {
-                        self.setSpeed(value: speed, then: {
-                            DispatchQueue.main.async {
-                                self.sliderValueField?.textColor = .systemBlue
+                        self.setSpeed(value: speed, then: { [weak self] in
+                            DispatchQueue.main.async { [weak self] in
+                                self?.sliderValueField?.textColor = .systemBlue
                             }
                         })
                     }
@@ -859,9 +837,9 @@ internal class FanView: NSStackView {
         }
         
         if let value = self.fan.customSpeed, !self.fan.mode.isAutomatic {
-            self.setSpeed(value: value, then: {
-                DispatchQueue.main.async {
-                    self.sliderValueField?.textColor = .systemBlue
+            self.setSpeed(value: value, then: { [weak self] in
+                DispatchQueue.main.async { [weak self] in
+                    self?.sliderValueField?.textColor = .systemBlue
                 }
             })
         }
@@ -992,12 +970,8 @@ private class ModeButtons: NSStackView {
     private var turboBtn: NSButton
     
     public init(frame: NSRect, mode: FanMode) {
-        var turboIcon: NSImage = NSImage(named: NSImage.Name("ac_unit"))!
-        var offIcon: NSImage = NSImage(named: NSImage.Name("ac_unit"))!
-        if #available(macOS 12.0, *) {
-            turboIcon = iconFromSymbol(name: "snowflake", scale: .large)
-            offIcon = iconFromSymbol(name: "fanblades.slash", scale: .medium)
-        }
+        let turboIcon: NSImage = iconFromSymbol(name: "snowflake", scale: .large)
+        let offIcon: NSImage = iconFromSymbol(name: "fanblades.slash", scale: .medium)
         
         self.offBtn = NSButton(image: offIcon, target: nil, action: #selector(offMode))
         self.turboBtn = NSButton(image: turboIcon, target: nil, action: #selector(turboMode))

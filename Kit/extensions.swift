@@ -12,10 +12,32 @@
 import Cocoa
 import Carbon
 
+internal final class RegexCache {
+    static let shared = RegexCache()
+
+    private var cache: [String: NSRegularExpression] = [:]
+    private let lock = NSLock()
+
+    func regex(_ pattern: String, options: NSRegularExpression.Options = []) -> NSRegularExpression? {
+        let key = "\(options.rawValue):\(pattern)"
+
+        self.lock.lock()
+        defer { self.lock.unlock() }
+
+        if let cached = self.cache[key] {
+            return cached
+        }
+
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: options) else {
+            return nil
+        }
+        self.cache[key] = regex
+        return regex
+    }
+}
+
 extension String: @retroactive LocalizedError {
     public var errorDescription: String? { return self }
-    
-    public var nilIfEmpty: String? { self.isEmpty ? nil : self }
     
     public var digits: String {
         return components(separatedBy: CharacterSet.decimalDigits.inverted).joined()
@@ -33,37 +55,35 @@ extension String: @retroactive LocalizedError {
     }
     
     public func findAndCrop(pattern: String) -> (cropped: String, remain: String) {
-        do {
-            let regex = try NSRegularExpression(pattern: pattern)
-            let range = NSRange(self.startIndex..., in: self)
-            
-            if let match = regex.firstMatch(in: self, options: [], range: range) {
-                if let range = Range(match.range, in: self) {
-                    let cropped = String(self[range]).trimmingCharacters(in: .whitespaces)
-                    let remaining = self.replacingOccurrences(of: cropped, with: "", options: .regularExpression).trimmingCharacters(in: .whitespaces)
-                    return (cropped, remaining)
-                }
-            }
-        } catch {
-            print("Error creating regex: \(error.localizedDescription)")
+        guard let regex = RegexCache.shared.regex(pattern) else {
+            return ("", self)
         }
-        
+        let range = NSRange(self.startIndex..., in: self)
+
+        if let match = regex.firstMatch(in: self, options: [], range: range) {
+            if let range = Range(match.range, in: self) {
+                let cropped = String(self[range]).trimmingCharacters(in: .whitespaces)
+                let remaining = self.replacingOccurrences(of: cropped, with: "", options: .regularExpression).trimmingCharacters(in: .whitespaces)
+                return (cropped, remaining)
+            }
+        }
+
         return ("", self)
     }
-    
+
     public func find(pattern: String) -> String {
-        do {
-            let regex = try NSRegularExpression(pattern: pattern)
-            let stringRange = NSRange(location: 0, length: self.utf16.count)
-            
-            if let searchRange = regex.firstMatch(in: self, options: [], range: stringRange) {
-                let start = self.index(self.startIndex, offsetBy: searchRange.range.lowerBound)
-                let end = self.index(self.startIndex, offsetBy: searchRange.range.upperBound)
-                let value  = String(self[start..<end]).trimmingCharacters(in: .whitespaces)
-                return value.trimmingCharacters(in: .whitespaces)
-            }
-        } catch {}
-        
+        guard let regex = RegexCache.shared.regex(pattern) else {
+            return ""
+        }
+        let stringRange = NSRange(location: 0, length: self.utf16.count)
+
+        if let searchRange = regex.firstMatch(in: self, options: [], range: stringRange) {
+            let start = self.index(self.startIndex, offsetBy: searchRange.range.lowerBound)
+            let end = self.index(self.startIndex, offsetBy: searchRange.range.upperBound)
+            let value  = String(self[start..<end]).trimmingCharacters(in: .whitespaces)
+            return value.trimmingCharacters(in: .whitespaces)
+        }
+
         return ""
     }
     
@@ -89,13 +109,11 @@ extension String: @retroactive LocalizedError {
     }
     
     public func removedRegexMatches(pattern: String, replaceWith: String = "") -> String {
-        do {
-            let regex = try NSRegularExpression(pattern: pattern, options: NSRegularExpression.Options.caseInsensitive)
-            let range = NSRange(location: 0, length: self.count)
-            return regex.stringByReplacingMatches(in: self, options: [], range: range, withTemplate: replaceWith)
-        } catch {
+        guard let regex = RegexCache.shared.regex(pattern, options: .caseInsensitive) else {
             return self
         }
+        let range = NSRange(location: 0, length: self.count)
+        return regex.stringByReplacingMatches(in: self, options: [], range: range, withTemplate: replaceWith)
     }
     
     func removingWhitespaces() -> String {
@@ -163,6 +181,20 @@ public extension Double {
         }
     }
     
+    func batteryColorV2(lowPowerMode: Bool = false) -> NSColor {
+        if lowPowerMode {
+            return NSColor.systemOrange
+        }
+        switch self {
+        case 0.2...0.4:
+            return NSColor.systemOrange
+        case 0.4...1:
+            return NSColor.systemGreen
+        default:
+            return NSColor.systemRed
+        }
+    }
+    
     func secondsToHoursMinutesSeconds() -> (Int, Int) {
         let mins = (self.truncatingRemainder(dividingBy: 3600)) / 60
         return (Int(self / 3600), Int(mins))
@@ -214,72 +246,6 @@ public extension NSView {
         }
     }
     
-    func toggleSettingRow(title: String, action: Selector, state: Bool) -> NSView {
-        let view: NSStackView = NSStackView()
-        view.translatesAutoresizingMaskIntoConstraints = false
-        view.heightAnchor.constraint(equalToConstant: Constants.Settings.row).isActive = true
-        view.orientation = .horizontal
-        view.alignment = .centerY
-        view.distribution = .fill
-        view.spacing = 0
-        
-        let titleField: NSTextField = LabelField(frame: NSRect(x: 0, y: 0, width: 0, height: 0), title)
-        titleField.font = NSFont.systemFont(ofSize: 12, weight: .regular)
-        titleField.textColor = .textColor
-        
-        let state: NSControl.StateValue = state ? .on : .off
-        var toggle: NSControl = NSControl()
-        if #available(OSX 10.15, *) {
-            let switchButton = NSSwitch()
-            switchButton.state = state
-            switchButton.action = action
-            switchButton.target = self
-            
-            toggle = switchButton
-        } else {
-            let button: NSButton = NSButton()
-            button.setButtonType(.switch)
-            button.state = state
-            button.title = ""
-            button.action = action
-            button.isBordered = false
-            button.isTransparent = false
-            button.target = self
-            button.wantsLayer = true
-            
-            toggle = button
-        }
-        
-        view.addArrangedSubview(titleField)
-        view.addArrangedSubview(NSView())
-        view.addArrangedSubview(toggle)
-        
-        return view
-    }
-    
-    func selectSettingsRow(title: String, action: Selector, items: [KeyValue_p], selected: String) -> NSView {
-        let view = NSStackView()
-        view.translatesAutoresizingMaskIntoConstraints = false
-        view.heightAnchor.constraint(equalToConstant: Constants.Settings.row).isActive = true
-        view.orientation = .horizontal
-        view.alignment = .centerY
-        view.distribution = .fill
-        view.spacing = 0
-        
-        let titleField: NSTextField = LabelField(frame: NSRect(x: 0, y: 0, width: 0, height: 0), title)
-        titleField.font = NSFont.systemFont(ofSize: 12, weight: .regular)
-        titleField.textColor = .textColor
-        
-        let select: NSPopUpButton = selectView(action: action, items: items, selected: selected)
-        select.sizeToFit()
-        
-        view.addArrangedSubview(titleField)
-        view.addArrangedSubview(NSView())
-        view.addArrangedSubview(select)
-        
-        return view
-    }
-    
     func selectView(action: Selector, items: [KeyValue_p], selected: String) -> NSPopUpButton {
         let select: NSPopUpButton = NSPopUpButton(frame: NSRect(x: 0, y: 4, width: 50, height: 28))
         select.target = self
@@ -301,6 +267,10 @@ public extension NSView {
         select.menu = menu
         
         return select
+    }
+    
+    func colorSelectView(action: Selector, items: [SColor], selected: String) -> NSView {
+        return SColorSelectView(target: self, action: action, items: items, selected: selected)
     }
     
     func switchView(action: Selector, state: Bool) -> NSSwitch {
@@ -374,6 +344,110 @@ public extension NSView {
     }
 }
 
+private class SColorSelectView: NSStackView {
+    private static let customKey = "custom"
+    
+    private weak var callbackTarget: NSObject?
+    private let callbackAction: Selector
+    private let select: NSPopUpButton = NSPopUpButton(frame: NSRect(x: 0, y: 4, width: 50, height: 28))
+    private let colorWell: NSColorWell = NSColorWell(frame: NSRect(x: 0, y: 0, width: 28, height: 24))
+    private var customItem: NSMenuItem?
+    
+    init(target: NSObject, action: Selector, items: [SColor], selected: String) {
+        self.callbackTarget = target
+        self.callbackAction = action
+        
+        super.init(frame: .zero)
+        
+        let selectedColor = SColor.fromString(selected)
+        self.orientation = .horizontal
+        self.alignment = .centerY
+        self.spacing = 6
+        
+        self.select.target = self
+        self.select.action = #selector(self.selectColor)
+        self.select.menu = self.menu(items: items, selected: selectedColor)
+        self.select.sizeToFit()
+        
+        if selectedColor.isCustom {
+            self.select.select(self.customItem)
+        }
+        
+        self.colorWell.color = selectedColor.additional as? NSColor ?? NSColor.controlAccentColor
+        self.colorWell.target = self
+        self.colorWell.action = #selector(self.changeCustomColor)
+        self.colorWell.widthAnchor.constraint(equalToConstant: 28).isActive = true
+        self.colorWell.heightAnchor.constraint(equalToConstant: 24).isActive = true
+        
+        self.addArrangedSubview(self.select)
+        self.addArrangedSubview(self.colorWell)
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    private func menu(items: [SColor], selected: SColor) -> NSMenu {
+        let menu = NSMenu()
+        items.forEach { (item) in
+            if item.key.contains("separator") {
+                menu.addItem(NSMenuItem.separator())
+            } else {
+                let menuItem = NSMenuItem(title: localizedString(item.value), action: nil, keyEquivalent: "")
+                menuItem.representedObject = item.key
+                menuItem.state = selected.key == item.key ? .on : .off
+                menu.addItem(menuItem)
+            }
+        }
+        
+        menu.addItem(NSMenuItem.separator())
+        let customItem = NSMenuItem(title: localizedString("Custom..."), action: nil, keyEquivalent: "")
+        customItem.representedObject = SColorSelectView.customKey
+        customItem.state = selected.isCustom ? .on : .off
+        menu.addItem(customItem)
+        self.customItem = customItem
+        
+        return menu
+    }
+    
+    @objc private func selectColor(_ sender: NSPopUpButton) {
+        guard let key = sender.selectedItem?.representedObject as? String else { return }
+        if key == SColorSelectView.customKey {
+            self.updateMenuState(selectedKey: key)
+            self.select.select(self.customItem)
+            self.colorWell.activate(true)
+            NSColorPanel.shared.orderFront(nil)
+            return
+        }
+        
+        let color = SColor.fromString(key)
+        if let nsColor = color.additional as? NSColor {
+            self.colorWell.color = nsColor
+        }
+        self.updateMenuState(selectedKey: key)
+        self.send(key)
+    }
+    
+    @objc private func changeCustomColor(_ sender: NSColorWell) {
+        self.updateMenuState(selectedKey: SColorSelectView.customKey)
+        self.select.select(self.customItem)
+        self.send(SColor.custom(sender.color).key)
+    }
+    
+    private func updateMenuState(selectedKey: String) {
+        self.select.menu?.items.forEach { (item) in
+            guard let key = item.representedObject as? String else { return }
+            item.state = key == selectedKey ? .on : .off
+        }
+    }
+    
+    private func send(_ key: String) {
+        let item = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        item.representedObject = key
+        _ = self.callbackTarget?.perform(self.callbackAction, with: item)
+    }
+}
+
 public class NSButtonWithPadding: NSButton {
     public var horizontalPadding: CGFloat = 0
     public var verticalPadding: CGFloat = 0
@@ -418,6 +492,46 @@ extension URL {
 }
 
 public extension NSColor {
+    convenience init?(hex: String) {
+        var value = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.hasPrefix("#") {
+            value.removeFirst()
+        }
+        guard value.count == 6 || value.count == 8, let intValue = UInt32(value, radix: 16) else {
+            return nil
+        }
+        
+        let red: CGFloat
+        let green: CGFloat
+        let blue: CGFloat
+        let alpha: CGFloat
+        if value.count == 8 {
+            red = CGFloat((intValue >> 24) & 0xff) / 255
+            green = CGFloat((intValue >> 16) & 0xff) / 255
+            blue = CGFloat((intValue >> 8) & 0xff) / 255
+            alpha = CGFloat(intValue & 0xff) / 255
+        } else {
+            red = CGFloat((intValue >> 16) & 0xff) / 255
+            green = CGFloat((intValue >> 8) & 0xff) / 255
+            blue = CGFloat(intValue & 0xff) / 255
+            alpha = 1
+        }
+        
+        self.init(deviceRed: red, green: green, blue: blue, alpha: alpha)
+    }
+    
+    var hexString: String {
+        guard let color = self.usingColorSpace(.deviceRGB) else {
+            return "#000000FF"
+        }
+        
+        let red = Int((color.redComponent * 255).rounded())
+        let green = Int((color.greenComponent * 255).rounded())
+        let blue = Int((color.blueComponent * 255).rounded())
+        let alpha = Int((color.alphaComponent * 255).rounded())
+        return String(format: "#%02X%02X%02X%02X", red, green, blue, alpha)
+    }
+    
     func grayscaled() -> NSColor {
         guard let space = CGColorSpace(name: CGColorSpace.extendedGray),
               let cg = self.cgColor.converted(to: space, intent: .perceptual, options: nil),

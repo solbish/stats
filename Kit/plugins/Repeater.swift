@@ -28,15 +28,19 @@ internal class Repeater {
     }
     
     deinit {
+        self.timer.setEventHandler {}
         self.timer.cancel()
-        self.start()
+        if self.state == .paused {
+            self.timer.resume()
+            self.state = .running
+        }
     }
     
     private func setupTimer(_ interval: Int) {
         self.timer.schedule(
             deadline: DispatchTime.now() + Double(interval),
             repeating: .seconds(interval),
-            leeway: .seconds(0)
+            leeway: .milliseconds(200)
         )
         self.timer.setEventHandler { [weak self] in
             self?.callback()

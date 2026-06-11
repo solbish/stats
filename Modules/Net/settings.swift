@@ -82,7 +82,6 @@ internal class Settings: NSStackView, Settings_v, NSTextFieldDelegate {
     public var publicIPRefreshIntervalCallback: (() -> Void) = {}
     
     private let title: String
-    private var sliderView: NSView? = nil
     private var section: PreferencesSection? = nil
     private var widgetThresholdSection: PreferencesSection? = nil
     private let textWidgetHelpPanel: HelpHUD = HelpHUD(textWidgetHelp)
@@ -304,6 +303,7 @@ internal class Settings: NSStackView, Settings_v, NSTextFieldDelegate {
         guard let key = sender.representedObject as? String else { return }
         self.usageReset = key
         Store.shared.set(key: "\(self.title)_usageReset", value: key)
+        Store.shared.remove("\(self.title)_usageReset_next")
         self.usageResetCallback()
     }
     @objc func toggleVPNMode(_ sender: NSControl) {

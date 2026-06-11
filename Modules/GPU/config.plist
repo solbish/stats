@@ -80,5 +80,10 @@
 		<key>notifications</key>
 		<true/>
 	</dict>
+	<key>Preview</key>
+	<dict>
+		<key>available</key>
+		<true/>
+	</dict>
 </dict>
 </plist>

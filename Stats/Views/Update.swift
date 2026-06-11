@@ -13,6 +13,8 @@ import Cocoa
 import Kit
 
 internal class UpdateWindow: NSWindow, NSWindowDelegate {
+    internal var onClose: (() -> Void)?
+    
     private let viewController: UpdateViewController = UpdateViewController()
     
     init() {
@@ -31,6 +33,8 @@ internal class UpdateWindow: NSWindow, NSWindowDelegate {
         self.title = "Stats"
         self.contentViewController = self.viewController
         self.titlebarAppearsTransparent = true
+        self.isReleasedWhenClosed = false
+        self.delegate = self
         self.positionCenter()
         self.setIsVisible(false)
         
@@ -45,6 +49,13 @@ internal class UpdateWindow: NSWindow, NSWindowDelegate {
             self.makeKeyAndOrderFront(nil)
         }
         self.viewController.open(v)
+    }
+    
+    func windowWillClose(_ notification: Notification) {
+        let onClose = self.onClose
+        DispatchQueue.main.async {
+            onClose?()
+        }
     }
     
     private func positionCenter() {
@@ -279,7 +290,7 @@ private class UpdateView: NSView {
     
     @objc private func changelog() {
         if let version = self.version {
-            NSWorkspace.shared.open(URL(string: "https://github.com/exelban/stats/releases/tag/\(version.latest)")!)
+            NSWorkspace.shared.open(URL(string: "https://github.com/solbish/stats/releases/tag/\(version.latest)")!)
         }
     }
     

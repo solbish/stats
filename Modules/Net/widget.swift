@@ -60,9 +60,6 @@ public struct Provider: TimelineProvider {
 
 @available(macOS 14.0, *)
 public struct NetworkWidget: Widget {
-    private var downloadColor: Color = Color(nsColor: NSColor.systemBlue)
-    private var uploadColor: Color = Color(nsColor: NSColor.systemRed)
-    
     public init() {}
     
     public var body: some WidgetConfiguration {
@@ -92,6 +89,12 @@ public struct NetworkWidget: Widget {
                                 Text("Status").font(.system(size: 12, weight: .regular)).foregroundColor(.secondary)
                                 Spacer()
                                 Text(value.status ? "UP" : "DOWN")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 1)
+                                    .background(value.status ? Color.green : Color.red)
+                                    .cornerRadius(4)
                             }
                             if let interface = value.interface {
                                 HStack {

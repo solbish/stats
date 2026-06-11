@@ -56,8 +56,6 @@ public class Portal: PortalWrapper {
         return value
     }
     
-    private var initialized: Bool = false
-    
     public override func load() {
         let view = NSStackView()
         view.orientation = .vertical
@@ -83,7 +81,7 @@ public class Portal: PortalWrapper {
             scale: self.chartScale,
             fixedScale: Double(self.chartFixedScaleSize.toBytes(self.chartFixedScale))
         )
-        chart.base = self.base
+        chart.setBase(self.base)
         container.addSubview(chart)
         self.chart = chart
         view.addArrangedSubview(container)
@@ -106,9 +104,7 @@ public class Portal: PortalWrapper {
     public func usageCallback(_ value: Network_Usage) {
         DispatchQueue.main.async(execute: {
             if let chart = self.chart {
-                if chart.base != self.base {
-                    chart.base = self.base
-                }
+                chart.setBase(self.base)
                 chart.addValue(upload: Double(value.bandwidth.upload), download: Double(value.bandwidth.download))
                 chart.setScale(self.chartScale, Double(self.chartFixedScaleSize.toBytes(self.chartFixedScale)))
                 chart.setColors(in: self.downloadColor, out: self.uploadColor)

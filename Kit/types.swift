@@ -19,11 +19,9 @@ public struct DoubleValue {
         self.value = value
     }
 }
-extension [DoubleValue] {
-    public func max() -> Double? { self.max(by: { $0.value < $1.value })?.value }
-}
 
 public struct ColorValue: Equatable {
+    public var ts: Date = Date()
     public let value: Double
     public var color: NSColor?
     
@@ -183,8 +181,18 @@ public struct SColor: KeyValue_p, Equatable {
     public let value: String
     public var additional: Any?
     
+    private static let customPrefix = "custom:"
+    
     public static func == (lhs: SColor, rhs: SColor) -> Bool {
         return lhs.key == rhs.key
+    }
+    
+    public static func custom(_ color: NSColor) -> SColor {
+        return SColor(key: "\(customPrefix)\(color.hexString)", value: "Custom...", additional: color)
+    }
+    
+    public var isCustom: Bool {
+        return self.key.hasPrefix(SColor.customPrefix)
     }
 }
 
@@ -250,7 +258,13 @@ extension SColor: CaseIterable {
     }
     
     public static func fromString(_ key: String, defaultValue: SColor = .systemAccent) -> SColor {
-        return SColor.allCases.first{ $0.key == key } ?? defaultValue
+        if let color = SColor.allCases.first(where: { $0.key == key }) {
+            return color
+        }
+        if key.hasPrefix(customPrefix), let color = NSColor(hex: String(key.dropFirst(customPrefix.count))) {
+            return SColor.custom(color)
+        }
+        return defaultValue
     }
 }
 
@@ -282,6 +296,7 @@ public extension Notification.Name {
     static let combinedModulesPopup = Notification.Name("combinedModulesPopup")
     static let remoteLoginSuccess = Notification.Name("remoteLoginSuccess")
     static let remoteState = Notification.Name("remoteState")
+    static let remoteAuthenticated = Notification.Name("remoteAuthenticated")
     static let openWindow = Notification.Name("openWindow")
 }
 
@@ -410,7 +425,7 @@ public enum RAMPressure: String, Codable {
         case .normal:
             return NSColor.systemGreen
         case .warning:
-            return NSColor.systemYellow
+            return NSColor.systemOrange
         case .critical:
             return NSColor.systemRed
         }
@@ -418,9 +433,23 @@ public enum RAMPressure: String, Codable {
 
     public func number() -> Int {
         switch self {
-        case .normal: return 0
-        case .warning: return 1
-        case .critical: return 2
+        case .normal:
+            return 0
+        case .warning:
+            return 1
+        case .critical:
+            return 2
+        }
+    }
+
+    public init(from: Int) {
+        switch from {
+        case 1:
+            self = .warning
+        case 2:
+            self = .critical
+        default:
+            self = .normal
         }
     }
 }

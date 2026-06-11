@@ -14,12 +14,6 @@ import Kit
 import SystemConfiguration
 import CoreWLAN
 
-struct ipResponse: Decodable {
-    var ip: String
-    var country: String
-    var cc: String
-}
-
 // swiftlint:disable control_statement
 extension CWPHYMode: @retroactive CustomStringConvertible {
     public var description: String {
@@ -144,19 +138,38 @@ internal class UsageReader: Reader<Network_Usage>, CWEventDelegate {
         get { Store.shared.bool(key: "Network_publicIP", defaultValue: true) }
     }
     
+    private var usageResetInterval: AppUpdateInterval? {
+        AppUpdateInterval(rawValue: Store.shared.string(key: "Network_usageReset", defaultValue: AppUpdateInterval.never.rawValue))
+    }
+    private var nextUsageResetDate: Date? {
+        get {
+            let ts = Store.shared.int(key: "Network_usageReset_next", defaultValue: 0)
+            return ts == 0 ? nil : Date(timeIntervalSince1970: TimeInterval(ts))
+        }
+        set {
+            if let newValue {
+                Store.shared.set(key: "Network_usageReset_next", value: Int(newValue.timeIntervalSince1970))
+            } else {
+                Store.shared.remove("Network_usageReset_next")
+            }
+        }
+    }
+    
     private let wifiClient = CWWiFiClient.shared()
     
     private var lastDetailsReadTS: Date = .distantPast
     
     public override func setup() {
-        self.reachability.reachable = {
+        self.reachability.reachable = { [weak self] in
+            guard let self else { return }
             if self.active {
                 self.getPublicIP()
                 self.getDetails()
                 self.getWiFiDetails()
             }
         }
-        self.reachability.unreachable = {
+        self.reachability.unreachable = { [weak self] in
+            guard let self else { return }
             if self.active {
                 self.getWiFiDetails()
                 self.usage.reset()
@@ -167,7 +180,8 @@ internal class UsageReader: Reader<Network_Usage>, CWEventDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(refreshPublicIP), name: .refreshPublicIP, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(resetTotalNetworkUsage), name: .resetTotalNetworkUsage, object: nil)
         
-        DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + 1) {
+        DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + 1) { [weak self] in
+            guard let self else { return }
             if self.active {
                 self.getPublicIP()
                 self.getDetails()
@@ -179,16 +193,22 @@ internal class UsageReader: Reader<Network_Usage>, CWEventDelegate {
             self.usage.bandwidth = Bandwidth()
         }
         
+        self.checkUsageReset()
+        
         self.wifiClient.delegate = self
         self.startListeningForWifiEvents()
     }
     
     public override func terminate() {
         self.reachability.stop()
+        self.reachability.reachable = {}
+        self.reachability.unreachable = {}
         self.stopListeningForWifiEvents()
+        self.wifiClient.delegate = nil
     }
     
     public override func read() {
+        self.checkUsageReset()
         self.getDetails()
         
         let current: Bandwidth = self.reader == "interface" ? self.readInterfaceBandwidth() : self.readProcessBandwidth()
@@ -203,6 +223,17 @@ internal class UsageReader: Reader<Network_Usage>, CWEventDelegate {
         
         self.usage.bandwidth.upload = max(self.usage.bandwidth.upload, 0) // prevent negative upload value
         self.usage.bandwidth.download = max(self.usage.bandwidth.download, 0) // prevent negative download value
+        
+        // drop one-shot counter jumps (e.g. on reconnect) that exceed what the link can physically deliver
+        let interval = self.interval ?? 1
+        let maxDelta: Int64 = {
+            if let rate = self.usage.interface?.transmitRate, rate > 0 {
+                return Int64(rate * 1_000_000 / 8 * 1.5 * interval) // 50% headroom over negotiated link rate
+            }
+            return Int64(2_000_000_000 * interval) // 16 Gbps fallback when link rate is unknown
+        }()
+        if self.usage.bandwidth.upload > maxDelta { self.usage.bandwidth.upload = 0 }
+        if self.usage.bandwidth.download > maxDelta { self.usage.bandwidth.download = 0 }
         
         self.usage.total.upload += self.usage.bandwidth.upload
         self.usage.total.download += self.usage.bandwidth.download
@@ -238,7 +269,9 @@ internal class UsageReader: Reader<Network_Usage>, CWEventDelegate {
             }
             self.usage.interface?.status = (pointer.pointee.ifa_flags & UInt32(IFF_UP)) != 0
             
-            if let raw = pointer.pointee.ifa_data {
+            if let wifiInterface = CWWiFiClient.shared().interface(withName: self.interfaceID) {
+                self.usage.interface?.transmitRate = wifiInterface.transmitRate()
+            } else if let raw = pointer.pointee.ifa_data {
                 let dataPtr = raw.assumingMemoryBound(to: if_data.self)
                 let ifData = dataPtr.pointee
                 let baud = UInt64(ifData.ifi_baudrate)
@@ -272,15 +305,19 @@ internal class UsageReader: Reader<Network_Usage>, CWEventDelegate {
         let outputPipe = Pipe()
         let errorPipe = Pipe()
         
+        task.standardInput = inputPipe
+        task.standardOutput = outputPipe
+        task.standardError = errorPipe
+        
         defer {
+            if task.isRunning {
+                task.terminate()
+            }
+            task.waitUntilExit()
             inputPipe.fileHandleForWriting.closeFile()
             outputPipe.fileHandleForReading.closeFile()
             errorPipe.fileHandleForReading.closeFile()
         }
-        
-        task.standardInput = inputPipe
-        task.standardOutput = outputPipe
-        task.standardError = errorPipe
         
         do {
             try task.run()
@@ -479,14 +516,12 @@ internal class UsageReader: Reader<Network_Usage>, CWEventDelegate {
     }
     
     private func getBytesInfo(_ pointer: UnsafeMutablePointer<ifaddrs>) -> (upload: Int64, download: Int64)? {
-        let addr = pointer.pointee.ifa_addr.pointee
-        
-        guard addr.sa_family == UInt8(AF_LINK) else {
+        guard let addrPtr = pointer.pointee.ifa_addr, addrPtr.pointee.sa_family == UInt8(AF_LINK) else {
             return nil
         }
-        
-        let data: UnsafeMutablePointer<if_data>? = unsafeBitCast(pointer.pointee.ifa_data, to: UnsafeMutablePointer<if_data>.self)
-        return (upload: Int64(data?.pointee.ifi_obytes ?? 0), download: Int64(data?.pointee.ifi_ibytes ?? 0))
+        guard let raw = pointer.pointee.ifa_data else { return nil }
+        let data = raw.assumingMemoryBound(to: if_data.self)
+        return (upload: Int64(data.pointee.ifi_obytes), download: Int64(data.pointee.ifi_ibytes))
     }
     
     private func isIPv4(_ ip: String) -> Bool {
@@ -503,9 +538,42 @@ internal class UsageReader: Reader<Network_Usage>, CWEventDelegate {
         }
     }
     
+    private func nextUsageReset(after date: Date) -> Date? {
+        let cal = Calendar.current
+        switch self.usageResetInterval {
+        case .oncePerDay:
+            return cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: date))
+        case .oncePerWeek:
+            guard let start = cal.dateInterval(of: .weekOfYear, for: date)?.start else { return nil }
+            return cal.date(byAdding: .weekOfYear, value: 1, to: start)
+        case .oncePerMonth:
+            guard let start = cal.dateInterval(of: .month, for: date)?.start else { return nil }
+            return cal.date(byAdding: .month, value: 1, to: start)
+        default:
+            return nil
+        }
+    }
+    
+    private func checkUsageReset() {
+        switch self.usageResetInterval {
+        case .oncePerDay, .oncePerWeek, .oncePerMonth: break
+        default: return
+        }
+        
+        guard let next = self.nextUsageResetDate else {
+            self.nextUsageResetDate = self.nextUsageReset(after: Date())
+            return
+        }
+        
+        if Date() >= next {
+            self.resetTotalNetworkUsage()
+        }
+    }
+    
     @objc func resetTotalNetworkUsage() {
         self.usage.total = Bandwidth()
         self.save(self.usage)
+        self.nextUsageResetDate = self.nextUsageReset(after: Date())
     }
     
     private func startListeningForWifiEvents() {
@@ -526,26 +594,6 @@ internal class UsageReader: Reader<Network_Usage>, CWEventDelegate {
     
     public func ssidDidChangeForWiFiInterface(withName interfaceName: String) {
         self.getWiFiDetails()
-    }
-    
-    private func isInterfaceUp(_ ifName: String) -> Bool {
-        var addrs: UnsafeMutablePointer<ifaddrs>? = nil
-        guard getifaddrs(&addrs) == 0, let first = addrs else { return false }
-        defer { freeifaddrs(addrs) }
-        
-        var ptr = first
-        while true {
-            let name = String(cString: ptr.pointee.ifa_name)
-            if name == ifName {
-                return (ptr.pointee.ifa_flags & UInt32(IFF_UP)) != 0
-            }
-            if let next = ptr.pointee.ifa_next {
-                ptr = next
-            } else {
-                break
-            }
-        }
-        return false
     }
 }
 
@@ -580,15 +628,19 @@ public class ProcessReader: Reader<[Network_Process]> {
         let outputPipe = Pipe()
         let errorPipe = Pipe()
         
+        task.standardInput = inputPipe
+        task.standardOutput = outputPipe
+        task.standardError = errorPipe
+        
         defer {
+            if task.isRunning {
+                task.terminate()
+            }
+            task.waitUntilExit()
             inputPipe.fileHandleForWriting.closeFile()
             outputPipe.fileHandleForReading.closeFile()
             errorPipe.fileHandleForReading.closeFile()
         }
-        
-        task.standardInput = inputPipe
-        task.standardOutput = outputPipe
-        task.standardError = errorPipe
         
         do {
             try task.run()
@@ -725,6 +777,7 @@ internal class ConnectivityReader: Reader<Network_Connectivity> {
     
     private var socket: CFSocket?
     private var socketSource: CFRunLoopSource?
+    private var socketInfo: Unmanaged<ConnectivityReaderWrapper>?
     
     private var wrapper: Network_Connectivity = Network_Connectivity(status: false)
     
@@ -1003,6 +1056,7 @@ internal class ConnectivityReader: Reader<Network_Connectivity> {
     private func openConn() {
         let info = ConnectivityReaderWrapper(self)
         let unmanagedSocketInfo = Unmanaged.passRetained(info)
+        self.socketInfo = unmanagedSocketInfo
         var context = CFSocketContext(version: 0, info: unmanagedSocketInfo.toOpaque(), retain: nil, release: nil, copyDescription: nil)
         self.socket = CFSocketCreate(kCFAllocatorDefault, AF_INET, SOCK_DGRAM, IPPROTO_ICMP, CFSocketCallBackType.dataCallBack.rawValue, { _, callBackType, _, data, info in
             guard let info = info, let data = data else { return }
@@ -1029,6 +1083,8 @@ internal class ConnectivityReader: Reader<Network_Connectivity> {
             CFSocketInvalidate(socket)
             self.socket = nil
         }
+        self.socketInfo?.release()
+        self.socketInfo = nil
         self.timeoutTimer?.invalidate()
         self.timeoutTimer = nil
     }

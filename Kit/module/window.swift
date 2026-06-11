@@ -15,16 +15,33 @@ public protocol Settings_v: NSView {
     func load(widgets: [widget_t])
 }
 
-public protocol Preview_v: NSView {}
+open class PreviewWrapper: NSStackView {
+    public let module: ModuleType
+    
+    public init(type: ModuleType) {
+        self.module = type
+        super.init(frame: NSRect.zero)
+        
+        self.orientation = .vertical
+        self.distribution = .gravityAreas
+        self.translatesAutoresizingMaskIntoConstraints = false
+        self.spacing = Constants.Settings.margin
+    }
+    
+    required public init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+}
 
 open class Window: NSStackView {
     private var config: UnsafePointer<module_c>
     private var widgets: [SWidget]
     
+    private var widgetSelector: NSView?
     private var segmentedControl: NSSegmentedControl?
     private var tabView: NSTabView?
     
-    private var modulePreview: Preview_v?
+    private var modulePreview: PreviewWrapper?
     private var moduleSettings: Settings_v?
     private var popupSettings: Popup_p?
     private var notificationsSettings: NotificationsWrapper?
@@ -59,7 +76,7 @@ open class Window: NSStackView {
     init(
         config: UnsafePointer<module_c>,
         widgets: UnsafeMutablePointer<[SWidget]>,
-        modulePreview: Preview_v?,
+        modulePreview: PreviewWrapper?,
         moduleSettings: Settings_v?,
         popupSettings: Popup_p?,
         notificationsSettings: NotificationsWrapper?
@@ -71,7 +88,7 @@ open class Window: NSStackView {
         self.popupSettings = popupSettings
         self.notificationsSettings = notificationsSettings
         
-        self.isPreviewAvailable = config.pointee.previewConfig["enabled"] as? Bool ?? false
+        self.isPreviewAvailable = config.pointee.previewConfig["available"] as? Bool ?? false
         
         self.isPopupSettingsAvailable = config.pointee.settingsConfig["popup"] as? Bool ?? false
         self.isNotificationsSettingsAvailable = config.pointee.settingsConfig["notifications"] as? Bool ?? false
@@ -82,29 +99,23 @@ open class Window: NSStackView {
         self.alignment = .width
         self.distribution = .fill
         self.spacing = Constants.Settings.margin
-        self.edgeInsets = NSEdgeInsets(
-            top: 0,
-            left: Constants.Settings.margin,
-            bottom: Constants.Settings.margin,
-            right: Constants.Settings.margin
-        )
         
         let settingsView = self.settings()
         self.settingsView = settingsView
-        let previewView = self.preview()
-        self.previewView = previewView
-        
         self.addArrangedSubview(settingsView)
-        self.addArrangedSubview(previewView)
+        
+        if self.isPreviewAvailable, let previewView = self.preview() {
+            settingsView.isHidden = true
+            self.addArrangedSubview(previewView)
+            self.previewView = previewView
+        }
         
         NotificationCenter.default.addObserver(self, selector: #selector(listenForOneView), name: .toggleOneView, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(listenForToggleView), name: .togglePreview, object: nil)
         
         self.segmentedControl?.widthAnchor.constraint(equalTo: self.widthAnchor, constant: -(Constants.Settings.margin*2)).isActive = true
-        
-        if self.isPreviewAvailable {
-            self.toggleView()
-        }
+        self.widgetSelector?.widthAnchor.constraint(equalTo: self.widthAnchor, constant: -(Constants.Settings.margin*2)).isActive = true
+        self.moduleSettings?.widthAnchor.constraint(equalTo: self.widthAnchor, constant: -(Constants.Settings.margin*2)).isActive = true
     }
     
     deinit {
@@ -120,28 +131,45 @@ open class Window: NSStackView {
         toggleNSControlState(self.enableControl, state: newState ? .on : .off)
     }
     
-    private func preview() -> NSView {
-        let container = NSStackView()
-        container.isHidden = true
-        container.orientation = .vertical
+    private func preview() -> NSView? {
+        guard let v = self.modulePreview else { return nil }
         
-        var view: NSView = EmptyView(height: 0, msg: localizedString("Preview is not available for that module"))
+        let scrollView: ScrollableStackView = ScrollableStackView()
+        scrollView.stackView.edgeInsets = NSEdgeInsets(
+            top: 0,
+            left: Constants.Settings.margin,
+            bottom: Constants.Settings.margin,
+            right: Constants.Settings.margin
+        )
+        scrollView.stackView.addArrangedSubview(v)
         
-        if self.isPreviewAvailable, let v = self.modulePreview {
-            view = v
-        }
-        
-        let scrollView = ScrollableStackView()
-        scrollView.stackView.addArrangedSubview(view)
-        container.addArrangedSubview(scrollView)
-        
-        return container
+        return scrollView
     }
     
     private func settings() -> NSView {
         let view = NSStackView()
         view.orientation = .vertical
         view.spacing = Constants.Settings.margin
+        view.edgeInsets = NSEdgeInsets(
+            top: 0,
+            left: Constants.Settings.margin,
+            bottom: Constants.Settings.margin,
+            right: Constants.Settings.margin
+        )
+        
+        if self.config.pointee.name == "Remote" {
+            let widgetSelector = WidgetSelectorView(module: self.config.pointee.name, widgets: self.widgets, stateCallback: self.loadWidget)
+            self.widgetSelector = widgetSelector
+            
+            view.addArrangedSubview(widgetSelector)
+            
+            if let settingsView = self.moduleSettings {
+                settingsView.load(widgets: self.widgets.filter { $0.isActive }.map { $0.type })
+                view.addArrangedSubview(settingsView)
+            }
+            
+            return view
+        }
         
         var labels: [String] = [
             localizedString("Module"),
@@ -312,10 +340,14 @@ open class Window: NSStackView {
         guard let moduleName = notification.userInfo?["module"], self.config.pointee.name == moduleName as? String else { return }
         self.toggleView()
     }
+    
     private func toggleView() {
-        guard let preview = self.previewView, let settings = self.settingsView else { return }
-        preview.isHidden = !preview.isHidden
-        settings.isHidden = !settings.isHidden
+        if let preview = self.previewView {
+            preview.isHidden = !preview.isHidden
+        }
+        if let settings = self.settingsView {
+            settings.isHidden = !settings.isHidden
+        }
     }
 }
 
