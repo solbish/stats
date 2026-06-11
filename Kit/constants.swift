@@ -19,13 +19,13 @@ public struct Popup_c_s {
     public let headerHeight: CGFloat = 42
     public let separatorHeight: CGFloat = 30
     public let portalHeight: CGFloat = 120
+    public let radius: CGFloat = 6
 }
 
 public struct Settings_c_s {
     public let width: CGFloat = 540
     public let height: CGFloat = 480
     public let margin: CGFloat = 10
-    public let row: CGFloat = 30
 }
 
 public struct Widget_c_s {
@@ -61,6 +61,7 @@ public enum ModuleType: Int {
     case bluetooth
     case clock
     case claude
+    case remote
 
     case combined
     
@@ -76,6 +77,7 @@ public enum ModuleType: Int {
         case .bluetooth: return "Bluetooth"
         case .clock: return "Clock"
         case .claude: return "Claude"
+        case .remote: return "Remote"
         case .combined: return ""
         }
     }

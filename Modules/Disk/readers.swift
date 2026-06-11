@@ -39,6 +39,7 @@ internal class CapacityReader: Reader<Disks> {
     private var SMART: Bool {
         Store.shared.bool(key: "\(ModuleType.disk.stringValue)_SMART", defaultValue: true)
     }
+    
     private var purgableSpace: [URL: (Date, Int64)] = [:]
     
     public override func read() {
@@ -95,15 +96,12 @@ internal class CapacityReader: Reader<Disks> {
         }
         
         self.callback(self.list)
+        
     }
-    
-    public func resetPurgableSpace(for uuid: String) {
-        if let disk = self.list.first(where: { $0.uuid == uuid }), let path = disk.path {
-            self.purgableSpace.removeValue(forKey: path)
-        }
-    }
-    
     private func freeDiskSpaceInBytes(_ path: URL) -> Int64 {
+        var path = path
+        path.removeAllCachedResourceValues()
+        
         var stat = statfs()
         if statfs(path.path, &stat) == 0 {
             var purgeable: Int64 = 0
@@ -125,11 +123,9 @@ internal class CapacityReader: Reader<Disks> {
         }
         
         do {
-            if let url = URL(string: path.absoluteString) {
-                let values = try url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
-                if let capacity = values.volumeAvailableCapacityForImportantUsage, capacity != 0 {
-                    return capacity
-                }
+            let values = try path.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
+            if let capacity = values.volumeAvailableCapacityForImportantUsage, capacity != 0 {
+                return capacity
             }
         } catch let err {
             error("error retrieving free space #1: \(err.localizedDescription)", log: self.log)
@@ -163,7 +159,7 @@ internal class CapacityReader: Reader<Disks> {
     private func getSMARTDetails(for BSDName: String) -> smart_t? {
         guard self.SMART else { return nil }
         
-        var disk = IOServiceGetMatchingService(kIOMasterPortDefault, IOBSDNameMatching(kIOMasterPortDefault, 0, BSDName.cString(using: .utf8)))
+        var disk = IOServiceGetMatchingService(kIOMainPortDefault, IOBSDNameMatching(kIOMainPortDefault, 0, BSDName.cString(using: .utf8)))
         guard disk != kIOReturnSuccess else { return nil }
         defer { IOObjectRelease(disk) }
         
@@ -302,7 +298,7 @@ internal class ActivityReader: Reader<Disks> {
     }
     
     private func driveStats(_ idx: Int, _ d: drive) {
-        let service = IOServiceGetMatchingService(kIOMasterPortDefault, IOBSDNameMatching(kIOMasterPortDefault, 0, d.BSDName))
+        let service = IOServiceGetMatchingService(kIOMainPortDefault, IOBSDNameMatching(kIOMainPortDefault, 0, d.BSDName))
         if service == 0 { return }
         IOObjectRelease(service)
         
@@ -465,8 +461,8 @@ public class ProcessReader: Reader<[Disk_process]> {
             }
             guard result != -1 else { return }
             
-            let bytesRead = Int(usage.ri_diskio_bytesread)
-            let bytesWritten = Int(usage.ri_diskio_byteswritten)
+            let bytesRead = Int(clamping: usage.ri_diskio_bytesread)
+            let bytesWritten = Int(clamping: usage.ri_diskio_byteswritten)
             
             if snapshot[pid] == nil {
                 snapshot[pid] = io(read: bytesRead, write: bytesWritten)

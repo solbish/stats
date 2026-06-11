@@ -20,7 +20,7 @@ public struct module_c {
     internal var settingsConfig: NSDictionary = NSDictionary()
     internal var previewConfig: NSDictionary = NSDictionary()
     
-    public var hasPreview: Bool { self.previewConfig["enabled"] as? Bool ?? false }
+    public var hasPreview: Bool { self.previewConfig["available"] as? Bool ?? false }
     
     init(in path: String) {
         let dict: NSDictionary = NSDictionary(contentsOfFile: path)!
@@ -98,7 +98,7 @@ open class Module {
     private var popup: PopupWindow? = nil
     private var popupView: Popup_p? = nil
     private var notificationsView: NotificationsWrapper? = nil
-    private var previewView: Preview_v? = nil
+    private var previewView: PreviewWrapper? = nil
     
     private let log: NextLog
     private var readers: [Reader_p] = []
@@ -114,7 +114,7 @@ open class Module {
         settings: Settings_v? = nil,
         portal: Portal_p? = nil,
         notifications: NotificationsWrapper? = nil,
-        preview: Preview_v? = nil
+        preview: PreviewWrapper? = nil
     ) {
         self.moduleType = moduleType
         self.portal = portal

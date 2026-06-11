@@ -90,8 +90,8 @@
 	</dict>
 	<key>Preview</key>
 	<dict>
-		<key>enabled</key>
-		<false/>
+		<key>available</key>
+		<true/>
 	</dict>
 </dict>
 </plist>

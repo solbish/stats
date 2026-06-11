@@ -35,14 +35,14 @@ internal class Popup: PopupWrapper {
     private var totalUploadField: ValueField? = nil
     private var totalDownloadLabel: LabelField? = nil
     private var totalDownloadField: ValueField? = nil
-    private var statusField: ValueField? = nil
-    private var connectivityField: ValueField? = nil
+    private var statusField: StatusBadgeView? = nil
+    private var connectivityField: StatusBadgeView? = nil
     private var latencyField: ValueField? = nil
     private var jitterField: ValueField? = nil
     
     private var interfaceView: NSStackView? = nil
     private var interfaceField: ValueField? = nil
-    private var interfaceStatusField: ValueField? = nil
+    private var interfaceStatusField: StatusBadgeView? = nil
     private var macAddressField: ValueField? = nil
     private var ssidField: ValueField? = nil
     private var standardField: ValueField? = nil
@@ -78,9 +78,10 @@ internal class Popup: PopupWrapper {
     private var chartPrefSection: PreferencesSection? = nil
     private var connectivityChart: GridChartView? = nil
     
-    private var initialized: Bool = false
     private var processesInitialized: Bool = false
-    private var connectionInitialized: Bool = false
+    
+    private let usageCache = PopupCache<Network_Usage>()
+    private let connectivityCache = PopupCache<Network_Connectivity?>()
     
     private var lastReset: Date = Date()
     private var latency: [Double] = []
@@ -206,7 +207,7 @@ internal class Popup: PopupWrapper {
         let container: NSView = NSView(frame: NSRect(x: 0, y: 0, width: self.frame.width, height: separator.frame.origin.y))
         container.wantsLayer = true
         container.layer?.backgroundColor = NSColor.lightGray.withAlphaComponent(0.1).cgColor
-        container.layer?.cornerRadius = 3
+        container.layer?.cornerRadius = Constants.Popup.radius
         
         let chart = NetworkChartView(
             frame: NSRect(x: 0, y: 1, width: container.frame.width, height: container.frame.height - 2),
@@ -214,7 +215,7 @@ internal class Popup: PopupWrapper {
             scale: self.chartScale,
             fixedScale: Double(self.chartFixedScaleSize.toBytes(self.chartFixedScale))
         )
-        chart.base = self.base
+        chart.setBase(self.base)
         container.addSubview(chart)
         self.chart = chart
         
@@ -254,13 +255,13 @@ internal class Popup: PopupWrapper {
         button.frame = CGRect(x: view.frame.width - 18, y: 6, width: 18, height: 18)
         button.bezelStyle = .regularSquare
         button.isBordered = false
-        button.imageScaling = NSImageScaling.scaleAxesIndependently
+        button.imageScaling = NSImageScaling.scaleProportionallyDown
         button.contentTintColor = .lightGray
         button.action = #selector(self.resetTotalNetworkUsage)
         button.target = self
         button.toolTip = localizedString("Reset")
-        button.image = Bundle(for: Module.self).image(forResource: "refresh")!
-        row.addSubview(separatorView(localizedString("Details"), width: self.frame.width))
+        button.image = iconFromSymbol(name: "arrow.clockwise", scale: .medium)
+        row.addSubview(separatorView(localizedString("Details"), width: self.frame.width, rightInset: 24))
         row.addSubview(button)
         view.addArrangedSubview(row)
         
@@ -275,8 +276,8 @@ internal class Popup: PopupWrapper {
         self.totalDownloadLabel = totalDownload.1
         self.totalDownloadField = totalDownload.2
         
-        self.statusField = popupRow(view, title: "\(localizedString("Status")):", value: localizedString("Unknown")).1
-        self.connectivityField = popupRow(view, title: "\(localizedString("Internet connection")):", value: localizedString("Unknown")).1
+        self.statusField = popupBadgeRow(view, title: "\(localizedString("Status")):").1
+        self.connectivityField = popupBadgeRow(view, title: "\(localizedString("Internet connection")):").1
         self.latencyField = popupRow(view, title: "\(localizedString("Latency")):", value: "0 ms").1
         self.jitterField = popupRow(view, title: "\(localizedString("Jitter")):", value: "0 ms").1
         
@@ -295,20 +296,20 @@ internal class Popup: PopupWrapper {
         button.frame = CGRect(x: view.frame.width - 18, y: 6, width: 18, height: 18)
         button.bezelStyle = .regularSquare
         button.isBordered = false
-        button.imageScaling = NSImageScaling.scaleAxesIndependently
+        button.imageScaling = NSImageScaling.scaleProportionallyDown
         button.contentTintColor = .lightGray
         button.action = #selector(self.toggleInterfaceDetails)
         button.target = self
         button.toolTip = localizedString("Details")
-        button.image = Bundle(for: Module.self).image(forResource: "tune")!
+        button.image = iconFromSymbol(name: "slider.horizontal.3", scale: .medium)
         
-        row.addSubview(separatorView(localizedString("Interface"), width: self.frame.width))
+        row.addSubview(separatorView(localizedString("Interface"), width: self.frame.width, rightInset: 24))
         row.addSubview(button)
         
         view.addArrangedSubview(row)
         
         self.interfaceField = popupRow(view, title: "\(localizedString("Interface")):", value: localizedString("Unknown")).1
-        self.interfaceStatusField = popupRow(view, title: "\(localizedString("Status")):", value: localizedString("Unknown")).1
+        self.interfaceStatusField = popupBadgeRow(view, title: "\(localizedString("Status")):").1
         self.macAddressField = popupRow(view, title: "\(localizedString("Physical address")):", value: localizedString("Unknown")).1
         self.macAddressField?.isSelectable = true
         
@@ -348,13 +349,13 @@ internal class Popup: PopupWrapper {
         button.frame = CGRect(x: view.frame.width - 18, y: 6, width: 18, height: 18)
         button.bezelStyle = .regularSquare
         button.isBordered = false
-        button.imageScaling = NSImageScaling.scaleAxesIndependently
+        button.imageScaling = NSImageScaling.scaleProportionallyDown
         button.contentTintColor = .lightGray
         button.action = #selector(self.refreshPublicIP)
         button.target = self
         button.toolTip = localizedString("Refresh")
-        button.image = Bundle(for: Module.self).image(forResource: "refresh")!
-        row.addSubview(separatorView(localizedString("Address"), width: self.frame.width))
+        button.image = iconFromSymbol(name: "arrow.clockwise", scale: .medium)
+        row.addSubview(separatorView(localizedString("Address"), width: self.frame.width, rightInset: 24))
         row.addSubview(button)
         view.addArrangedSubview(row)
         
@@ -407,6 +408,11 @@ internal class Popup: PopupWrapper {
     
     // MARK: - callbacks
     
+    public override func appear() {
+        self.replay(self.usageCache, render: self.renderUsage)
+        self.replay(self.connectivityCache, render: self.renderConnectivity)
+    }
+    
     public func numberOfProcessesUpdated() {
         if self.processes?.count == self.numberOfProcesses { return }
         
@@ -421,194 +427,193 @@ internal class Popup: PopupWrapper {
     }
     
     public func usageCallback(_ value: Network_Usage) {
-        DispatchQueue.main.async(execute: {
-            if (self.window?.isVisible ?? false) || !self.initialized {
-                var resized = false
-                self.uploadValue = value.bandwidth.upload
-                self.downloadValue = value.bandwidth.download
-                self.setUploadDownloadFields()
-                
-                self.totalUploadField?.stringValue = Units(bytes: value.total.upload).getReadableMemory()
-                self.totalDownloadField?.stringValue = Units(bytes: value.total.download).getReadableMemory()
-                
-                let form = DateComponentsFormatter()
-                form.maximumUnitCount = 2
-                form.unitsStyle = .full
-                form.allowedUnits = [.day, .hour, .minute]
-                
-                if let duration = form.string(from: self.lastReset, to: Date()) {
-                    self.totalUploadLabel?.toolTip = localizedString("Last reset", duration)
-                    self.totalDownloadLabel?.toolTip = localizedString("Last reset", duration)
-                }
-                
-                if let interface = value.interface {
-                    self.interfaceField?.stringValue = "\(interface.displayName) (\(interface.BSDName)"
-                    if let cc = value.wifiDetails.countryCode {
-                        self.interfaceField?.stringValue += ", \(cc)"
-                    }
-                    self.interfaceField?.stringValue += ")"
-                    self.interfaceStatusField?.stringValue = localizedString(interface.status ? "UP" : "DOWN")
-                    self.macAddressField?.stringValue = interface.address
-                    self.interfaceSpeedField?.stringValue = "\(Int(interface.transmitRate.rounded()))baseT"
-                } else {
-                    self.interfaceField?.stringValue = localizedString("Unknown")
-                    self.interfaceStatusField?.stringValue = localizedString("Unknown")
-                    self.macAddressField?.stringValue = localizedString("Unknown")
-                    self.interfaceSpeedField?.stringValue = localizedString("Unknown")
-                }
-                
-                if value.connectionType == .wifi {
-                    if let view = self.ssidView, view.superview == nil && value.wifiDetails.ssid != nil {
-                        self.interfaceView?.addArrangedSubview(view)
-                        resized = true
-                    }
-                    if self.interfaceDetailsState, let view = self.standardView, view.superview == nil && value.wifiDetails.standard != nil {
-                        self.interfaceView?.addArrangedSubview(view)
-                        resized = true
-                    }
-                    if self.interfaceDetailsState, let view = self.channelView, view.superview == nil && value.wifiDetails.channel != nil {
-                        self.interfaceView?.addArrangedSubview(view)
-                        resized = true
-                    }
-                    
-                    self.ssidField?.stringValue = value.wifiDetails.ssid ?? localizedString("Unknown")
-                    if let v = value.wifiDetails.RSSI {
-                        self.ssidField?.stringValue += " (\(v))"
-                    }
-                    self.standardField?.stringValue = value.wifiDetails.standard ?? localizedString("Unknown")
-                    self.channelField?.stringValue = value.wifiDetails.channel ?? localizedString("Unknown")
-                    
-                    var rssi = localizedString("Unknown")
-                    if let v = value.wifiDetails.RSSI {
-                        rssi = "\(v) dBm"
-                    }
-                    var noise = localizedString("Unknown")
-                    if let v = value.wifiDetails.noise {
-                        noise = "\(v) dBm"
-                    }
-                    
-                    let number = value.wifiDetails.channelNumber ?? localizedString("Unknown")
-                    let band = value.wifiDetails.channelBand ?? localizedString("Unknown")
-                    let width = value.wifiDetails.channelWidth ?? localizedString("Unknown")
-                    self.channelField?.toolTip = "RSSI: \(rssi)\nNoise: \(noise)\nChannel number: \(number)\nChannel band: \(band)\nChannel width: \(width)\n"
-                } else {
-                    if self.ssidView?.superview != nil {
-                        self.ssidField?.stringValue = localizedString("Unavailable")
-                        self.ssidView?.removeFromSuperview()
-                        resized = true
-                    }
-                    if self.standardField?.superview != nil {
-                        self.standardField?.stringValue = localizedString("Unavailable")
-                        self.standardView?.removeFromSuperview()
-                        resized = true
-                    }
-                    if self.channelView?.superview != nil {
-                        self.channelField?.stringValue = localizedString("Unavailable")
-                        self.channelView?.removeFromSuperview()
-                        resized = true
-                    }
-                }
-                
-                var privateIP = localizedString("Unknown")
-                if let v4 = value.laddr.v4, !v4.isEmpty {
-                    privateIP = v4
-                } else if let v6 = value.laddr.v6, !v6.isEmpty {
-                    privateIP = v6
-                }
-                if self.localIPField?.stringValue != privateIP {
-                    self.localIPField?.stringValue = privateIP
-                }
-                
-                if let view = self.publicIPv4View {
-                    if let addr = value.raddr.v4 {
-                        if view.superview == nil {
-                            self.addressView?.addArrangedSubview(view)
-                            resized = true
-                        }
-                        var ip = addr
-                        if let cc = value.raddr.countryCode, !cc.isEmpty {
-                            if self.emojiCCState, let flag = countryFlag(cc) {
-                                ip += " \(flag)"
-                            } else {
-                                ip += " (\(cc))"
-                            }
-                            self.publicIPv4Field?.toolTip = cc
-                        }
-                        if self.publicIPv4Field?.stringValue != ip {
-                            self.publicIPv4Field?.stringValue = ip
-                        }
-                    } else if view.superview != nil {
-                        view.removeFromSuperview()
-                        resized = true
-                        self.publicIPv4Field?.stringValue = localizedString("Unknown")
-                    }
-                }
-                
-                if let view = self.publicIPv6View {
-                    if let addr = value.raddr.v6 {
-                        if view.superview == nil {
-                            self.addressView?.addArrangedSubview(view)
-                            resized = true
-                        }
-                        var ip = addr
-                        if let cc = value.raddr.countryCode {
-                            if self.emojiCCState, let flag = countryFlag(cc) {
-                                ip += " \(flag)"
-                            } else {
-                                ip += " (\(cc))"
-                            }
-                            self.publicIPv6Field?.toolTip = cc
-                        }
-                        if self.publicIPv6Field?.stringValue != ip {
-                            self.publicIPv6Field?.stringValue = ip
-                        }
-                    } else if view.superview != nil {
-                        view.removeFromSuperview()
-                        resized = true
-                        self.publicIPv6Field?.stringValue = localizedString("Unknown")
-                    }
-                }
-                
-                if self.interfaceDetailsState {
-                    if !value.dns.isEmpty {
-                        let servers = value.dns.joined(separator: "\n")
-                        
-                        if self.dnsServersField == nil || value.dns.count != self.dnsServersField?.stringValue.split(separator: "\n").count {
-                            if let view = self.dnsServersView {
-                                view.removeFromSuperview()
-                            }
-                            let view = popupRow(self.interfaceView, title: "\(localizedString("DNS Server")):", value: servers, multiline: true)
-                            self.dnsServersField = view.1
-                            self.dnsServersView = view.2
-                            self.dnsServersField?.isSelectable = true
-                        }
-                        
-                        if self.dnsServersField?.stringValue != servers {
-                            self.dnsServersField?.stringValue = servers
-                        }
-                        
-                        resized = true
-                    } else if let view = self.dnsServersView {
-                        view.removeFromSuperview()
-                        resized = true
-                    }
-                }
-                
-                self.statusField?.stringValue = localizedString(value.status ? "UP" : "DOWN")
-                
-                if resized {
-                    self.recalculateHeight()
-                }
-                self.initialized = true
+        self.apply(value, to: self.usageCache, render: self.renderUsage)
+        
+        if let chart = self.chart {
+            chart.setBase(self.base)
+            chart.addValue(upload: Double(value.bandwidth.upload), download: Double(value.bandwidth.download))
+        }
+    }
+    
+    private func renderUsage(_ value: Network_Usage) {
+        var resized = false
+        self.uploadValue = value.bandwidth.upload
+        self.downloadValue = value.bandwidth.download
+        self.setUploadDownloadFields()
+        
+        self.totalUploadField?.stringValue = Units(bytes: value.total.upload).getReadableMemory()
+        self.totalDownloadField?.stringValue = Units(bytes: value.total.download).getReadableMemory()
+        
+        let form = DateComponentsFormatter()
+        form.maximumUnitCount = 2
+        form.unitsStyle = .full
+        form.allowedUnits = [.day, .hour, .minute]
+        
+        if let duration = form.string(from: self.lastReset, to: Date()) {
+            self.totalUploadLabel?.toolTip = localizedString("Last reset", duration)
+            self.totalDownloadLabel?.toolTip = localizedString("Last reset", duration)
+        }
+        
+        if let interface = value.interface {
+            self.interfaceField?.stringValue = "\(interface.displayName) (\(interface.BSDName)"
+            if let cc = value.wifiDetails.countryCode {
+                self.interfaceField?.stringValue += ", \(cc)"
+            }
+            self.interfaceField?.stringValue += ")"
+            self.interfaceStatusField?.setStatus(interface.status)
+            self.macAddressField?.stringValue = interface.address
+            self.interfaceSpeedField?.stringValue = "\(Int(interface.transmitRate.rounded()))Mbps"
+        } else {
+            self.interfaceField?.stringValue = localizedString("Unknown")
+            self.interfaceStatusField?.setStatus(nil)
+            self.macAddressField?.stringValue = localizedString("Unknown")
+            self.interfaceSpeedField?.stringValue = localizedString("Unknown")
+        }
+        
+        if value.connectionType == .wifi {
+            if let view = self.ssidView, view.superview == nil && value.wifiDetails.ssid != nil {
+                self.interfaceView?.addArrangedSubview(view)
+                resized = true
+            }
+            if self.interfaceDetailsState, let view = self.standardView, view.superview == nil && value.wifiDetails.standard != nil {
+                self.interfaceView?.addArrangedSubview(view)
+                resized = true
+            }
+            if self.interfaceDetailsState, let view = self.channelView, view.superview == nil && value.wifiDetails.channel != nil {
+                self.interfaceView?.addArrangedSubview(view)
+                resized = true
             }
             
-            if let chart = self.chart {
-                if chart.base != self.base {
-                    chart.base = self.base
-                }
-                chart.addValue(upload: Double(value.bandwidth.upload), download: Double(value.bandwidth.download))
+            self.ssidField?.stringValue = value.wifiDetails.ssid ?? localizedString("Unknown")
+            if let v = value.wifiDetails.RSSI {
+                self.ssidField?.stringValue += " (\(v))"
             }
-        })
+            self.standardField?.stringValue = value.wifiDetails.standard ?? localizedString("Unknown")
+            self.channelField?.stringValue = value.wifiDetails.channel ?? localizedString("Unknown")
+            
+            var rssi = localizedString("Unknown")
+            if let v = value.wifiDetails.RSSI {
+                rssi = "\(v) dBm"
+            }
+            var noise = localizedString("Unknown")
+            if let v = value.wifiDetails.noise {
+                noise = "\(v) dBm"
+            }
+            
+            let number = value.wifiDetails.channelNumber ?? localizedString("Unknown")
+            let band = value.wifiDetails.channelBand ?? localizedString("Unknown")
+            let width = value.wifiDetails.channelWidth ?? localizedString("Unknown")
+            self.channelField?.toolTip = "RSSI: \(rssi)\nNoise: \(noise)\nChannel number: \(number)\nChannel band: \(band)\nChannel width: \(width)\n"
+        } else {
+            if self.ssidView?.superview != nil {
+                self.ssidField?.stringValue = localizedString("Unavailable")
+                self.ssidView?.removeFromSuperview()
+                resized = true
+            }
+            if self.standardField?.superview != nil {
+                self.standardField?.stringValue = localizedString("Unavailable")
+                self.standardView?.removeFromSuperview()
+                resized = true
+            }
+            if self.channelView?.superview != nil {
+                self.channelField?.stringValue = localizedString("Unavailable")
+                self.channelView?.removeFromSuperview()
+                resized = true
+            }
+        }
+        
+        var privateIP = localizedString("Unknown")
+        if let v4 = value.laddr.v4, !v4.isEmpty {
+            privateIP = v4
+        } else if let v6 = value.laddr.v6, !v6.isEmpty {
+            privateIP = v6
+        }
+        if self.localIPField?.stringValue != privateIP {
+            self.localIPField?.stringValue = privateIP
+        }
+        
+        if let view = self.publicIPv4View {
+            if let addr = value.raddr.v4 {
+                if view.superview == nil {
+                    self.addressView?.addArrangedSubview(view)
+                    resized = true
+                }
+                var ip = addr
+                if let cc = value.raddr.countryCode, !cc.isEmpty {
+                    if self.emojiCCState, let flag = countryFlag(cc) {
+                        ip += " \(flag)"
+                    } else {
+                        ip += " (\(cc))"
+                    }
+                    self.publicIPv4Field?.toolTip = cc
+                }
+                if self.publicIPv4Field?.stringValue != ip {
+                    self.publicIPv4Field?.stringValue = ip
+                }
+            } else if view.superview != nil {
+                view.removeFromSuperview()
+                resized = true
+                self.publicIPv4Field?.stringValue = localizedString("Unknown")
+            }
+        }
+        
+        if let view = self.publicIPv6View {
+            if let addr = value.raddr.v6 {
+                if view.superview == nil {
+                    self.addressView?.addArrangedSubview(view)
+                    resized = true
+                }
+                var ip = addr
+                if let cc = value.raddr.countryCode {
+                    if self.emojiCCState, let flag = countryFlag(cc) {
+                        ip += " \(flag)"
+                    } else {
+                        ip += " (\(cc))"
+                    }
+                    self.publicIPv6Field?.toolTip = cc
+                }
+                if self.publicIPv6Field?.stringValue != ip {
+                    self.publicIPv6Field?.stringValue = ip
+                }
+            } else if view.superview != nil {
+                view.removeFromSuperview()
+                resized = true
+                self.publicIPv6Field?.stringValue = localizedString("Unknown")
+            }
+        }
+        
+        if self.interfaceDetailsState {
+            if !value.dns.isEmpty {
+                let servers = value.dns.joined(separator: "\n")
+                
+                if self.dnsServersField == nil || value.dns.count != self.dnsServersField?.stringValue.split(separator: "\n").count {
+                    if let view = self.dnsServersView {
+                        view.removeFromSuperview()
+                    }
+                    let view = popupRow(self.interfaceView, title: "\(localizedString("DNS Server")):", value: servers, multiline: true)
+                    self.dnsServersField = view.1
+                    self.dnsServersView = view.2
+                    self.dnsServersField?.isSelectable = true
+                }
+                
+                if self.dnsServersField?.stringValue != servers {
+                    self.dnsServersField?.stringValue = servers
+                }
+                
+                resized = true
+            } else if let view = self.dnsServersView {
+                view.removeFromSuperview()
+                resized = true
+            }
+        }
+        
+        self.statusField?.setStatus(value.status)
+        
+        if resized {
+            self.recalculateHeight()
+        }
+        
+        self.chart?.display()
     }
     
     public func connectivityCallback(_ value: Network_Connectivity?) {
@@ -622,32 +627,30 @@ internal class Popup: PopupWrapper {
         }
         self.jitter.append(value?.jitter ?? 0)
         
-        DispatchQueue.main.async(execute: {
-            if (self.window?.isVisible ?? false) || !self.connectionInitialized {
-                var text = "Unknown"
-                var latency = localizedString("Unknown")
-                var jitter = localizedString("Unknown")
-                
-                if let v = value {
-                    text = v.status ? "UP" : "DOWN"
-                    if v.status && !self.latency.isEmpty {
-                        latency = "\((self.latency.reduce(0, +) / Double(self.latency.count)).rounded(toPlaces: 2)) ms"
-                    }
-                    if v.status && !self.jitter.isEmpty {
-                        jitter = "\((self.jitter.reduce(0, +) / Double(self.jitter.count)).rounded(toPlaces: 2)) ms"
-                    }
-                }
-                self.latencyField?.stringValue = latency
-                self.jitterField?.stringValue = jitter
-                
-                self.connectivityField?.stringValue = localizedString(text)
-                self.connectionInitialized = true
+        self.apply(value, to: self.connectivityCache, render: self.renderConnectivity)
+        
+        if let value, let chart = self.connectivityChart {
+            chart.addValue(value.status)
+        }
+    }
+    
+    private func renderConnectivity(_ value: Network_Connectivity?) {
+        var latency = localizedString("Unknown")
+        var jitter = localizedString("Unknown")
+        
+        if let v = value {
+            if v.status && !self.latency.isEmpty {
+                latency = "\((self.latency.reduce(0, +) / Double(self.latency.count)).rounded(toPlaces: 2)) ms"
             }
-            
-            if let value, let chart = self.connectivityChart {
-                chart.addValue(value.status)
+            if v.status && !self.jitter.isEmpty {
+                jitter = "\((self.jitter.reduce(0, +) / Double(self.jitter.count)).rounded(toPlaces: 2)) ms"
             }
-        })
+        }
+        self.latencyField?.stringValue = latency
+        self.jitterField?.stringValue = jitter
+        
+        self.connectivityField?.setStatus(value?.status)
+        self.connectivityChart?.display()
     }
     
     public func processCallback(_ list: [Network_Process]) {
@@ -670,7 +673,7 @@ internal class Popup: PopupWrapper {
     }
     
     public func resetConnectivityView() {
-        self.connectivityField?.stringValue = localizedString("Unknown")
+        self.connectivityField?.setStatus(nil)
     }
     
     // MARK: - Settings
@@ -686,12 +689,12 @@ internal class Popup: PopupWrapper {
         ]))
         
         view.addArrangedSubview(PreferencesSection([
-            PreferencesRow(localizedString("Color of download"), component: selectView(
+            PreferencesRow(localizedString("Color of download"), component: colorSelectView(
                 action: #selector(self.toggleDownloadColor),
                 items: SColor.allColors,
                 selected: self.downloadColorState.key
             )),
-            PreferencesRow(localizedString("Color of upload"), component: selectView(
+            PreferencesRow(localizedString("Color of upload"), component: colorSelectView(
                 action: #selector(self.toggleUploadColor),
                 items: SColor.allColors,
                 selected: self.uploadColorState.key
@@ -740,13 +743,10 @@ internal class Popup: PopupWrapper {
     }
     
     @objc private func toggleUploadColor(_ sender: NSMenuItem) {
-        guard let key = sender.representedObject as? String,
-              let newValue = SColor.allColors.first(where: { $0.key == key }) else {
-            return
-        }
-        self.uploadColorState = newValue
-        Store.shared.set(key: "\(self.title)_uploadColor", value: key)
-        if let color = newValue.additional as? NSColor {
+        guard let key = sender.representedObject as? String else { return }
+        self.uploadColorState = SColor.fromString(key, defaultValue: self.uploadColorState)
+        Store.shared.set(key: "\(self.title)_uploadColor", value: self.uploadColorState.key)
+        if let color = self.uploadColorState.additional as? NSColor {
             self.processes?.setColor(1, color)
             self.uploadColorView?.layer?.backgroundColor = color.cgColor
             self.uploadStateView?.setColor(color)
@@ -754,13 +754,10 @@ internal class Popup: PopupWrapper {
         }
     }
     @objc private func toggleDownloadColor(_ sender: NSMenuItem) {
-        guard let key = sender.representedObject as? String,
-              let newValue = SColor.allColors.first(where: { $0.key == key }) else {
-            return
-        }
-        self.downloadColorState = newValue
-        Store.shared.set(key: "\(self.title)_downloadColor", value: key)
-        if let color = newValue.additional as? NSColor {
+        guard let key = sender.representedObject as? String else { return }
+        self.downloadColorState = SColor.fromString(key, defaultValue: self.downloadColorState)
+        Store.shared.set(key: "\(self.title)_downloadColor", value: self.downloadColorState.key)
+        if let color = self.downloadColorState.additional as? NSColor {
             self.processes?.setColor(0, color)
             self.downloadColorView?.layer?.backgroundColor = color.cgColor
             self.downloadStateView?.setColor(color)
@@ -872,19 +869,20 @@ internal class Popup: PopupWrapper {
         unitField.textColor = .labelColor
         unitField.alignment = .left
         
-        let titleWidth: CGFloat = title.widthOfString(usingFont: NSFont.systemFont(ofSize: 12, weight: .regular))+8
+        let titleWidth: CGFloat = title.widthOfString(usingFont: NSFont.systemFont(ofSize: 11, weight: .regular))+8
         let iconSize: CGFloat = 12
         let bottomWidth: CGFloat = titleWidth+iconSize
         let bottomView: NSView = NSView(frame: NSRect(
             x: (view.frame.width-bottomWidth)/2,
-            y: topView.frame.origin.y - titleHeight,
+            y: topView.frame.origin.y - titleHeight - 2,
             width: bottomWidth,
             height: titleHeight
         ))
         
-        let colorBlock: ColorView = ColorView(frame: NSRect(x: 0, y: 1, width: iconSize, height: iconSize), color: color, radius: 4)
+        let colorBlock: ColorView = ColorView(frame: NSRect(x: 0, y: 2, width: iconSize, height: iconSize), color: color, radius: 4)
         let titleField = LabelField(frame: NSRect(x: iconSize, y: 0, width: titleWidth, height: titleHeight), title)
         titleField.alignment = .center
+        titleField.font = NSFont.systemFont(ofSize: 11, weight: .regular)
         
         topView.addSubview(valueField)
         topView.addSubview(unitField)

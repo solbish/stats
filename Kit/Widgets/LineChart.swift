@@ -107,6 +107,8 @@ public class LineChart: WidgetWrapper {
             self.chart.reinit(self.historyCount)
         }
         
+        self.addSubview(self.chart)
+        
         if self.labelState {
             self.setFrameSize(NSSize(width: Constants.Widget.width + 6 + (Constants.Widget.margin.x*2), height: self.frame.size.height))
         }
@@ -116,7 +118,7 @@ public class LineChart: WidgetWrapper {
             for _ in 0..<16 {
                 list.append(DoubleValue(Double.random(in: 0..<1)))
             }
-            self.chart.points = list
+            self.chart.setPoints(list)
             self._value = 0.38
         }
         
@@ -132,6 +134,8 @@ public class LineChart: WidgetWrapper {
             let str = NSAttributedString.init(string: "\(char)", attributes: stringAttributes)
             self.NSLabelCharts.append(str)
         }
+        
+        self.chart.setTooltipEnabled(false)
     }
     
     required init?(coder: NSCoder) {
@@ -141,7 +145,7 @@ public class LineChart: WidgetWrapper {
     public override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         
-        guard let context = NSGraphicsContext.current?.cgContext else { return }
+        guard NSGraphicsContext.current != nil else { return }
         
         var value: Double = 0
         var pressureLevel: RAMPressure = .normal
@@ -218,25 +222,22 @@ public class LineChart: WidgetWrapper {
             (isDarkMode ? NSColor.white : NSColor.black).set()
             box.stroke()
             box.fill()
-            self.chart.transparent = false
+            self.chart.setTransparent(false)
         } else if self.frameState {
-            self.chart.transparent = true
+            self.chart.setTransparent(true)
         } else {
-            self.chart.transparent = true
+            self.chart.setTransparent(true)
         }
         
-        context.saveGState()
-        context.translateBy(x: x+offset+lineWidth, y: offset)
-
         let chartSize = NSSize(
             width: box.bounds.width - (offset*2+lineWidth),
             height: box.bounds.height - offset
         )
-        self.chart.color = color
-        self.chart.setFrameSize(chartSize)
-        self.chart.draw(NSRect(origin: .zero, size: chartSize))
-
-        context.restoreGState()
+        self.chart.setColor(color)
+        let chartFrame = NSRect(x: x+offset+lineWidth, y: offset, width: chartSize.width, height: chartSize.height)
+        if self.chart.frame != chartFrame {
+            self.chart.frame = chartFrame
+        }
         
         if self.boxState || self.frameState {
             (isDarkMode ? NSColor.white : NSColor.black).set()
@@ -290,7 +291,7 @@ public class LineChart: WidgetWrapper {
             )),
             PreferencesRow(localizedString("Box"), component: box),
             PreferencesRow(localizedString("Frame"), component: frame),
-            PreferencesRow(localizedString("Color"), component: selectView(
+            PreferencesRow(localizedString("Color"), component: colorSelectView(
                 action: #selector(self.toggleColor),
                 items: self.colors,
                 selected: self.colorState.key
@@ -354,10 +355,8 @@ public class LineChart: WidgetWrapper {
     
     @objc private func toggleColor(_ sender: NSMenuItem) {
         guard let key = sender.representedObject as? String else { return }
-        if let newColor = SColor.allCases.first(where: { $0.key == key }) {
-            self.colorState = newColor
-        }
-        Store.shared.set(key: "\(self.title)_\(self.type.rawValue)_color", value: key)
+        self.colorState = SColor.fromString(key, defaultValue: self.colorState)
+        Store.shared.set(key: "\(self.title)_\(self.type.rawValue)_color", value: self.colorState.key)
         self.display()
     }
     

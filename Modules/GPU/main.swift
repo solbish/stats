@@ -41,6 +41,7 @@ public struct GPU_Info: Codable {
     public var renderUtilization: Double? = nil
     public var tilerUtilization: Double? = nil
     public var aneUtilization: Double? = nil
+    public var fps: Double? = nil
     
     init(id: String, type: GPU_type, IOClass: String, vendor: String? = nil, model: String, cores: Int?, utilization: Double? = nil, render: Double? = nil, tiler: Double? = nil) {
         self.id = id
@@ -110,12 +111,11 @@ public class GPU: Module {
     private let settingsView: Settings
     private let portalView: Portal
     private let notificationsView: Notifications
+    private let previewView: Preview
     
     private var infoReader: InfoReader? = nil
     
     private var selectedGPU: String = ""
-    private var notificationLevelState: Bool = false
-    private var notificationID: String? = nil
     
     private var showType: Bool {
         Store.shared.bool(key: "\(self.config.name)_showType", defaultValue: false)
@@ -126,17 +126,19 @@ public class GPU: Module {
     }
     
     public init() {
-        self.popupView = Popup()
+        self.popupView = Popup(.GPU)
         self.settingsView = Settings(.GPU)
         self.portalView = Portal(.GPU)
         self.notificationsView = Notifications(.GPU)
+        self.previewView = Preview(.GPU)
         
         super.init(
             moduleType: .GPU,
             popup: self.popupView,
             settings: self.settingsView,
             portal: self.portalView,
-            notifications: self.notificationsView
+            notifications: self.notificationsView,
+            preview: self.previewView,
         )
         guard self.available else { return }
         
@@ -162,9 +164,6 @@ public class GPU: Module {
     private func infoCallback(_ raw: GPUs?) {
         guard raw != nil && !raw!.list.isEmpty, let value = raw, self.enabled else { return }
         
-        DispatchQueue.main.async(execute: {
-            self.popupView.infoCallback(value)
-        })
         self.settingsView.setList(value)
         
         let activeGPUs = value.active()
@@ -176,8 +175,10 @@ public class GPU: Module {
             return
         }
         
+        self.popupView.loadCallback(selectedGPU)
         self.portalView.callback(selectedGPU)
         self.notificationsView.usageCallback(utilization)
+        self.previewView.loadCallback(selectedGPU)
         
         self.menuBar.widgets.filter{ $0.isActive }.forEach { (w: SWidget) in
             switch w.item {

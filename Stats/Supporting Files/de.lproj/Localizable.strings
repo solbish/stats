@@ -178,7 +178,7 @@
 "Number of threads" = "%0 Threads";
 "Number of e-cores" = "%0 Effizienzkerne";
 "Number of p-cores" = "%0 Leistungskerne";
-"Number of s-cores" = "%0 Super-Prozessoren"; // translategemma:4b
+"Number of s-cores" = "%0 S-Kerne";
 "Disks" = "Festplatten";
 "Display" = "Bildschirm";
 
@@ -191,7 +191,7 @@
 // Widgets
 "Color" = "Farbe";
 "Label" = "Beschriftung";
-"Box" = "Karton"; // translategemma:4b
+"Box" = "Box";
 "Frame" = "Rahmen";
 "Value" = "Wert";
 "Colorize" = "Einfärben";
@@ -212,7 +212,7 @@
 "Stack widget" = "Stapel";
 "Memory widget" = "Speicher";
 "Static width" = "Feste Breite";
-"Tachometer widget" = "Drehzahlmesser"; // translategemma:4b
+"Tachometer widget" = "Drehzahlmesser"; // gemma4:31b
 "State widget" = "Status-Widget";
 "Text widget" = "Text-Widget";
 "Battery details widget" = "Batteriedetails-Widget";
@@ -227,6 +227,7 @@
 "Default color" = "Standard";
 "Transparent when no activity" = "Transparent bei Inaktivität";
 "Constant color" = "Konstant";
+"Custom..." = "Benutzerdefiniert...";
 
 // Module Kit
 "Open module settings" = "Modul-Einstellungen öffnen";
@@ -291,10 +292,10 @@
 "Efficiency cores load" = "Effizienzkerne-Last";
 "Performance cores load" = "Leistungskerne-Last";
 "All cores" = "Alle Kerne";
-"Load per core" = "Laden pro Kern"; // translategemma:4b
-"Efficiency core" = "Kern der Effizienz"; // translategemma:4b
-"Performance core" = "Leistungszentrum"; // translategemma:4b
-"Super core" = "Hervorragende Kernfunktion"; // translategemma:4b
+"Load per core" = "Last pro Kern";
+"Efficiency core" = "Effizienzkern";
+"Performance core" = "Leistungskern";
+"Super core" = "Superkern";
 
 // GPU
 "GPU to show" = "Anzuzeigende GPU";
@@ -356,6 +357,8 @@
 "Read speed" = "Lesen";
 "Drives" = "Laufwerke";
 "SMART data" = "SMART-Daten";
+"Power cycles" = "Power cycles";
+"Power on hours" = "Power on hours";
 
 // Sensors
 "Temperature unit" = "Temperatureinheit";
@@ -419,8 +422,8 @@
 "Network activity" = "Netzwerkaktivität";
 "Last reset" = "Letzte Zurücksetzung vor %0";
 "Latency" = "Latenz";
-"Upload speed" = "Hochladen"; // translategemma:4b
-"Download speed" = "Herunterladen"; // translategemma:4b
+"Upload speed" = "Uploadgeschwindigkeit";
+"Download speed" = "Downloadgeschwindigkeit";
 "Address" = "Adresse";
 "WiFi network" = "WLAN-Netzwerk";
 "Local IP changed" = "Lokale IP hat sich geändert";
@@ -429,7 +432,7 @@
 "New IP" = "Neue IP: %0";
 "Internet connection lost" = "Internetverbindung unterbrochen";
 "Internet connection established" = "Internetverbindung hergestellt";
-"Show country code instead of emoji" = "Zeige den Landescode anstelle des Emojis"; // translategemma:4b
+"Show country code instead of emoji" = "Ländercode statt Emoji anzeigen"; // gemma4:31b
 
 // Battery
 "Level" = "Ladezustand";
@@ -479,12 +482,12 @@
 "Time zone" = "Zeitzone";
 "Local" = "Lokal";
 "Calendar" = "Kalender";
-"Show week numbers" = "Zeige die Wochennummern"; // translategemma:4b
+"Show week numbers" = "Kalenderwochen anzeigen"; // gemma4:31b
 "Local time" = "Ortszeit";
 "Add new clock" = "Neue Uhr hinzufügen";
 "Delete selected clock" = "Ausgewählte Uhr löschen";
 "Help with datetime format" = "Hilfe zum Datums-/Zeitformat";
-"Sync with NTP server" = "Synchronisieren mit NTP-Server"; // translategemma:4b
+"Sync with NTP server" = "Synchronisation mit NTP-Server"; // gemma4:31b
 
 // Colors
 "Based on utilization" = "Nach Auslastung";

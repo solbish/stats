@@ -27,7 +27,6 @@ internal class Settings: NSStackView, Settings_v {
     public var selectedHandler: (String) -> Void = {_ in }
     
     private let title: String
-    private var button: NSPopUpButton?
     private var list: [Sensor_p] = []
     private var sensorsPrefs: PreferencesSection?
     private var selectedSensor: String = "Average System Total"
@@ -120,7 +119,7 @@ internal class Settings: NSStackView, Settings_v {
         
         var buttonList: [KeyValue_t] = []
         types.forEach { (typ: SensorType) in
-            let section = PreferencesSection(label: localizedString(typ.rawValue))
+            let section = PreferencesSection(title: localizedString(typ.rawValue))
             section.identifier = NSUserInterfaceItemIdentifier("sensor")
             
             let filtered = sensors.filter{ $0.type == typ }

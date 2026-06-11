@@ -139,13 +139,13 @@ public class Network: Module {
     private let settingsView: Settings
     private let portalView: Portal
     private let notificationsView: Notifications
+    private let previewView: Preview
     
     private var usageReader: UsageReader? = nil
     private var processReader: ProcessReader? = nil
     private var connectivityReader: ConnectivityReader? = nil
     
     private let ipUpdater = NSBackgroundActivityScheduler(identifier: "eu.exelban.Stats.Network.IP")
-    private let usageReseter = NSBackgroundActivityScheduler(identifier: "eu.exelban.Stats.Network.Usage")
     
     private var widgetActivationThresholdState: Bool {
         Store.shared.bool(key: "\(self.config.name)_widgetActivationThresholdState", defaultValue: false)
@@ -172,13 +172,15 @@ public class Network: Module {
         self.popupView = Popup(.network)
         self.portalView = Portal(.network)
         self.notificationsView = Notifications(.network)
+        self.previewView = Preview(.network)
         
         super.init(
             moduleType: .network,
             popup: self.popupView,
             settings: self.settingsView,
             portal: self.portalView,
-            notifications: self.notificationsView
+            notifications: self.notificationsView,
+            preview: self.previewView
         )
         guard self.available else { return }
         
@@ -194,10 +196,11 @@ public class Network: Module {
             self?.connectivityCallback(value)
         }
         
-        self.settingsView.callbackWhenUpdateNumberOfProcesses = {
+        self.settingsView.callbackWhenUpdateNumberOfProcesses = { [weak self] in
+            guard let self else { return }
             self.popupView.numberOfProcessesUpdated()
-            DispatchQueue.global(qos: .background).async {
-                self.processReader?.read()
+            DispatchQueue.global(qos: .background).async { [weak self] in
+                self?.processReader?.read()
             }
         }
         
@@ -243,6 +246,7 @@ public class Network: Module {
         self.popupView.usageCallback(value)
         self.portalView.usageCallback(value)
         self.notificationsView.usageCallback(value)
+        self.previewView.usageCallback(value)
         
         var upload: Int64 = value.bandwidth.upload
         var download: Int64 = value.bandwidth.download
@@ -349,6 +353,7 @@ public class Network: Module {
         
         self.popupView.connectivityCallback(value)
         self.notificationsView.connectivityCallback(value)
+        self.previewView.connectivityCallback(value)
         
         self.menuBar.widgets.filter{ $0.isActive }.forEach { (w: SWidget) in
             switch w.item {
@@ -383,26 +388,8 @@ public class Network: Module {
     }
     
     private func setUsageReset() {
-        self.usageReseter.invalidate()
-        
-        switch AppUpdateInterval(rawValue: Store.shared.string(key: "\(self.config.name)_usageReset", defaultValue: AppUpdateInterval.never.rawValue)) {
-        case .oncePerDay: self.usageReseter.interval = 60 * 60 * 24
-        case .oncePerWeek: self.usageReseter.interval = 60 * 60 * 24 * 7
-        case .oncePerMonth: self.usageReseter.interval = 60 * 60 * 24 * 30
-        case .atStart: NotificationCenter.default.post(name: .resetTotalNetworkUsage, object: nil, userInfo: nil)
-        case .never: return
-        default: return
-        }
-        
-        self.usageReseter.repeats = true
-        self.usageReseter.schedule { (completion: @escaping NSBackgroundActivityScheduler.CompletionHandler) in
-            guard self.enabled && self.isAvailable() else {
-                return
-            }
-            
-            debug("going to reset the usage...")
+        if AppUpdateInterval(rawValue: Store.shared.string(key: "\(self.config.name)_usageReset", defaultValue: AppUpdateInterval.never.rawValue)) == .atStart {
             NotificationCenter.default.post(name: .resetTotalNetworkUsage, object: nil, userInfo: nil)
-            completion(NSBackgroundActivityScheduler.Result.finished)
         }
     }
 }

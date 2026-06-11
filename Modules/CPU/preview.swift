@@ -12,7 +12,7 @@
 import Cocoa
 import Kit
 
-internal class Preview: NSStackView, Preview_v {
+internal class Preview: PreviewWrapper {
     private var initialized: Bool = false
     private var initializedAverage: Bool = false
     private var initializedFrequency: Bool = false
@@ -28,7 +28,7 @@ internal class Preview: NSStackView, Preview_v {
     
     private var eCoresColor: NSColor {
         let color = SColor.teal
-        let key = Store.shared.string(key: "CPU_eCoresColor", defaultValue: color.key)
+        let key = Store.shared.string(key: "\(self.module.stringValue)_eCoresColor", defaultValue: color.key)
         if let c = SColor.fromString(key).additional as? NSColor {
             return c
         }
@@ -36,7 +36,7 @@ internal class Preview: NSStackView, Preview_v {
     }
     private var pCoresColor: NSColor {
         let color = SColor.indigo
-        let key = Store.shared.string(key: "CPU_pCoresColor", defaultValue: color.key)
+        let key = Store.shared.string(key: "\(self.module.stringValue)_pCoresColor", defaultValue: color.key)
         if let c = SColor.fromString(key).additional as? NSColor {
             return c
         }
@@ -44,7 +44,7 @@ internal class Preview: NSStackView, Preview_v {
     }
     private var sCoresColor: NSColor {
         let color = SColor.orange
-        let key = Store.shared.string(key: "CPU_sCoresColor", defaultValue: color.key)
+        let key = Store.shared.string(key: "\(self.module.stringValue)_sCoresColor", defaultValue: color.key)
         if let c = SColor.fromString(key).additional as? NSColor {
             return c
         }
@@ -68,27 +68,18 @@ internal class Preview: NSStackView, Preview_v {
     
     private var cores: [CoreView] = []
     
-    private var loadLineChartHistory: Int = 180
-    private var loadLineChartScale: Scale = .none
-    private var loadLineChartFixedScale: Double = 1
-    
     public init(_ module: ModuleType) {
-        super.init(frame: NSRect.zero)
-        
-        self.orientation = .vertical
-        self.distribution = .gravityAreas
-        self.translatesAutoresizingMaskIntoConstraints = false
-        self.spacing = Constants.Settings.margin
+        super.init(type: module)
         
         self.addArrangedSubview(PreferencesSection([self.totalView()]))
-        self.addArrangedSubview(PreferencesSection(label: localizedString("Usage history"), [self.historyView()]))
-        self.addArrangedSubview(PreferencesSection(label: localizedString("Load per core"), [self.coresView()]))
+        self.addArrangedSubview(PreferencesSection(title: localizedString("Usage history"), [self.historyView()]))
+        self.addArrangedSubview(PreferencesSection(title: localizedString("Load per core"), [self.coresView()]))
         
         let splitView = NSStackView()
         splitView.orientation = .horizontal
         splitView.distribution = .fillEqually
-        splitView.addArrangedSubview(PreferencesSection(label: localizedString("Average load"), [self.averageView()]))
-        splitView.addArrangedSubview(PreferencesSection(label: localizedString("Frequency"), [self.frequencyView()]))
+        splitView.addArrangedSubview(PreferencesSection(title: localizedString("Average load"), [self.averageView()]))
+        splitView.addArrangedSubview(PreferencesSection(title: localizedString("Frequency"), [self.frequencyView()]))
         
         self.addArrangedSubview(splitView)
         self.addArrangedSubview(NSView())
@@ -121,6 +112,7 @@ internal class Preview: NSStackView, Preview_v {
             let view = NSStackView()
             view.orientation = .vertical
             view.distribution = .fillEqually
+            view.spacing = 2
             
             var titleValue = localizedString("Unknown")
             if let cpu = SystemKit.shared.device.info.cpu {
@@ -133,6 +125,8 @@ internal class Preview: NSStackView, Preview_v {
                     titleValue.append(" (\(eCores)E)")
                 } else if let pCores = cpu.pCores {
                     titleValue.append(" (\(pCores)P)")
+                } else if let sCores = cpu.sCores {
+                    titleValue.append(" (\(sCores)S)")
                 }
             }
             
@@ -170,10 +164,11 @@ internal class Preview: NSStackView, Preview_v {
         view.orientation = .vertical
         view.distribution = .fillEqually
         view.spacing = Constants.Settings.margin*2
-        view.heightAnchor.constraint(equalToConstant: 100).isActive = true
+        view.heightAnchor.constraint(equalToConstant: 140).isActive = true
         
-        let chart = LineChartView(num: self.loadLineChartHistory, scale: self.loadLineChartScale, fixedScale: self.loadLineChartFixedScale)
-        chart.color = self.chartColor
+        let chart = LineChartView(num: 600)
+        chart.setColor(self.chartColor)
+        chart.setLegend(x: true, y: true)
         self.loadLineChart = chart
         view.addArrangedSubview(chart)
         
@@ -199,6 +194,7 @@ internal class Preview: NSStackView, Preview_v {
         if let cpu = SystemKit.shared.device.info.cpu, let cores = cpu.cores {
             var e = 0
             var p = 0
+            var s = 0
             
             for (i, core) in cores.enumerated() {
                 var num = i
@@ -209,6 +205,9 @@ internal class Preview: NSStackView, Preview_v {
                 } else if core.type == .performance {
                     p += 1
                     num = p
+                } else if core.type == .super {
+                    s += 1
+                    num = s
                 }
                 
                 let c = CoreView(core, num: num)

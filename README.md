@@ -27,6 +27,10 @@ Download [Stats.dmg](https://github.com/solbish/stats/releases/latest/download/S
 xattr -cr /Applications/Stats.app
 ```
 
+## Requirements
+
+Stats is supported on the released macOS version starting from macOS 12 (Monterey).
+
 ## Setup & Login
 
 The Claude module supports two authentication methods. **Claude.ai Web** is the primary method with more frequent updates.
@@ -275,6 +279,26 @@ Increase the update interval in settings to reduce API calls.
 - No data is sent to third parties
 - All communication is directly with claude.ai
 - Session tokens are masked in the UI (only last 8 characters shown)
+
+---
+
+## FAQ
+
+### Stats icons do not appear in the menu bar
+macOS 26 introduced a new privacy control under System Settings → Menu Bar. Apps must be explicitly allowed there to display menu bar items. If Stats is running with at least one module active and one widget enabled, but none of its icons show up in the menu bar, this is almost certainly the cause. More details you can find [here](https://github.com/exelban/stats/issues/3120).
+
+**Solution:** open **System Settings → Menu Bar** and toggle **Stats** ON.
+
+### Desktop widgets not showing the data
+Due to a problem with high data load in the system process (`chronod`) responsible for communication between the app and widgets, communication is disabled by default on the Stats side. To enable it, the `macOS widgets` option must be enabled in the Stats settings. More details you can find [here](https://github.com/exelban/stats/issues/2733).
+
+**Solution:** open **Stats Settings** and toggle **macOS widgets** ON.
+
+### How to reduce energy impact or CPU usage of Stats?
+Stats tries to be efficient as it's possible. But reading some data periodically is not a cheap task. Each module has its own "price". So, if you want to reduce energy impact from the Stats you need to disable some Stats modules. The most inefficient modules are Sensors and Bluetooth. Disabling these modules could reduce CPU usage and power efficiency by up to 50% in some cases.
+
+### How to contribute to the project?
+If you want to develop a new feature or you've found something that doesn't work, the first step is to open an issue so the feature or problem can be discussed. Pull requests should only be opened for existing issues and after discussion; otherwise, they may be closed automatically. There are a few cases where this can be skipped: for language changes, and for contributors who have already made significant contributions and whose implementations align well with the project.
 
 ---
 

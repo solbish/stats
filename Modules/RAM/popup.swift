@@ -17,7 +17,7 @@ internal class Popup: PopupWrapper {
     
     private let dashboardHeight: CGFloat = 90
     private let chartHeight: CGFloat = 90 + Constants.Popup.separatorHeight
-    private let detailsHeight: CGFloat = (22*6) + Constants.Popup.separatorHeight
+    private let detailsHeight: CGFloat = (22*6) + Constants.Popup.separatorHeight + 16
     private let processHeight: CGFloat = 22
     
     private var usedField: NSTextField? = nil
@@ -36,10 +36,12 @@ internal class Popup: PopupWrapper {
     private var sliderView: NSView? = nil
     
     private var chart: LineChartView? = nil
+    private var bar: BarChartView = BarChartView(size: 10, horizontal: true)
     private var circle: PieChartView? = nil
-    private var level: PieChartView? = nil
-    private var initialized: Bool = false
+    private var level: GaugeChartView? = nil
     private var processesInitialized: Bool = false
+    
+    private let loadCache = PopupCache<RAM_Usage>()
     
     private var processes: ProcessesView? = nil
     
@@ -109,6 +111,10 @@ internal class Popup: PopupWrapper {
         self.chart?.display()
     }
     
+    public override func appear() {
+        self.replay(self.loadCache, render: self.renderLoad)
+    }
+    
     public override func disappear() {
         self.processes?.setLock(false)
     }
@@ -133,29 +139,45 @@ internal class Popup: PopupWrapper {
     }
     
     private func initDashboard() -> NSView {
-        let view: NSView = NSView(frame: NSRect(x: 0, y: self.frame.height - self.dashboardHeight, width: self.frame.width, height: self.dashboardHeight))
+        let view = NSStackView()
+        view.heightAnchor.constraint(equalToConstant: self.dashboardHeight).isActive = true
+        view.orientation = .horizontal
+        view.distribution = .fillEqually
         
-        let container: NSView = NSView(frame: NSRect(x: 0, y: 10, width: view.frame.width, height: self.dashboardHeight-20))
-        self.circle = PieChartView(frame: NSRect(
-            x: (container.frame.width - container.frame.height)/2,
-            y: 0,
-            width: container.frame.height,
-            height: container.frame.height
-        ), segments: [], drawValue: true)
-        self.circle!.toolTip = localizedString("Memory usage")
-        container.addSubview(self.circle!)
+        let circle = PieChartView(drawValue: true)
+        circle.translatesAutoresizingMaskIntoConstraints = false
+        circle.toolTip = localizedString("Memory usage")
+        self.circle = circle
         
-        let centralWidth: CGFloat = self.dashboardHeight-20
-        let sideWidth: CGFloat = (view.frame.width - centralWidth - (Constants.Popup.margins*2))/2
-        self.level = PieChartView(frame: NSRect(x: (sideWidth - 60)/2, y: 10, width: 60, height: 50), segments: [
+        let circleContainer = NSView()
+        circleContainer.addSubview(circle)
+        
+        let gauge = GaugeChartView(segments: [
             ColorValue(1/3, color: NSColor.systemGreen),
             ColorValue(1/3, color: NSColor.systemYellow),
             ColorValue(1/3, color: NSColor.systemRed)
-        ], drawValue: true, drawNeedle: true, openCircle: true)
-        self.level!.toolTip = localizedString("Memory pressure")
+        ], title: localizedString("Normal"))
+        gauge.translatesAutoresizingMaskIntoConstraints = false
+        gauge.toolTip = localizedString("Memory pressure")
+        self.level = gauge
         
-        view.addSubview(self.level!)
-        view.addSubview(container)
+        let gaugeContainer = NSView()
+        gaugeContainer.addSubview(gauge)
+        
+        NSLayoutConstraint.activate([
+            circle.widthAnchor.constraint(equalToConstant: 70),
+            circle.heightAnchor.constraint(equalToConstant: 70),
+            circle.centerXAnchor.constraint(equalTo: circleContainer.centerXAnchor, constant: -15),
+            circle.centerYAnchor.constraint(equalTo: circleContainer.centerYAnchor),
+            
+            gauge.widthAnchor.constraint(equalToConstant: 70),
+            gauge.heightAnchor.constraint(equalToConstant: 60),
+            gauge.centerXAnchor.constraint(equalTo: gaugeContainer.centerXAnchor, constant: 15),
+            gauge.centerYAnchor.constraint(equalTo: gaugeContainer.centerYAnchor)
+        ])
+        
+        view.addArrangedSubview(gaugeContainer)
+        view.addArrangedSubview(circleContainer)
         
         return view
     }
@@ -166,11 +188,11 @@ internal class Popup: PopupWrapper {
         let container: NSView = NSView(frame: NSRect(x: 0, y: 0, width: self.frame.width, height: separator.frame.origin.y))
         container.wantsLayer = true
         container.layer?.backgroundColor = NSColor.lightGray.withAlphaComponent(0.1).cgColor
-        container.layer?.cornerRadius = 3
+        container.layer?.cornerRadius = Constants.Popup.radius
         
         let chartFrame = NSRect(x: 1, y: 0, width: view.frame.width - 2, height: container.frame.height)
         self.chart = LineChartView(frame: chartFrame, num: self.lineChartHistory, scale: self.lineChartScale, fixedScale: self.lineChartFixedScale)
-        self.chart?.color = self.chartColor
+        self.chart?.setColor(self.chartColor)
         container.addSubview(self.chart!)
         
         view.addSubview(separator)
@@ -187,6 +209,7 @@ internal class Popup: PopupWrapper {
         container.spacing = 0
         
         self.usedField = popupRow(container, title: "\(localizedString("Used")):", value: "").1
+        container.addArrangedSubview(self.bar)
         (self.appColorView, _, self.appField) = popupWithColorRow(container, color: self.appColor, title: "\(localizedString("App")):", value: "")
         (self.wiredColorView, _, self.wiredField) = popupWithColorRow(container, color: self.wiredColor, title: "\(localizedString("Wired")):", value: "")
         (self.compressedColorView, _, self.compressedField) = popupWithColorRow(container, color: self.compressedColor, title: "\(localizedString("Compressed")):", value: "")
@@ -217,55 +240,41 @@ internal class Popup: PopupWrapper {
         return view
     }
     
-    private func addFirstRow(mView: NSView, y: CGFloat, title: String, value: String) -> NSTextField {
-        let rowView: NSView = NSView(frame: NSRect(x: 0, y: y, width: mView.frame.width, height: 16))
-        
-        let labelWidth = title.widthOfString(usingFont: .systemFont(ofSize: 10, weight: .light)) + 4
-        let labelView: NSTextField = TextView(frame: NSRect(x: 0, y: 1.5, width: labelWidth, height: 13))
-        labelView.stringValue = title
-        labelView.alignment = .natural
-        labelView.font = NSFont.systemFont(ofSize: 10, weight: .light)
-        
-        let valueView: NSTextField = TextView(frame: NSRect(x: labelWidth, y: 1, width: mView.frame.width - labelWidth, height: 14))
-        valueView.stringValue = value
-        valueView.alignment = .right
-        valueView.font = NSFont.systemFont(ofSize: 11, weight: .medium)
-        
-        rowView.addSubview(labelView)
-        rowView.addSubview(valueView)
-        mView.addSubview(rowView)
-        
-        return valueView
+    public func loadCallback(_ value: RAM_Usage) {
+        self.apply(value, to: self.loadCache, render: self.renderLoad)
+        self.chart?.addValue(value.usage)
     }
     
-    public func loadCallback(_ value: RAM_Usage) {
-        DispatchQueue.main.async(execute: {
-            if (self.window?.isVisible ?? false) || !self.initialized {
-                self.appField?.stringValue = Units(bytes: Int64(value.app)).getReadableMemory(style: .memory)
-                self.inactiveField?.stringValue = Units(bytes: Int64(value.inactive)).getReadableMemory(style: .memory)
-                self.wiredField?.stringValue = Units(bytes: Int64(value.wired)).getReadableMemory(style: .memory)
-                self.compressedField?.stringValue = Units(bytes: Int64(value.compressed)).getReadableMemory(style: .memory)
-                self.swapField?.stringValue = Units(bytes: Int64(value.swap.used)).getReadableMemory(style: .memory)
-                
-                self.usedField?.stringValue = Units(bytes: Int64(value.used)).getReadableMemory(style: .memory)
-                self.freeField?.stringValue = Units(bytes: Int64(value.free)).getReadableMemory(style: .memory)
-                
-                self.circle?.toolTip = "\(localizedString("Memory usage")): \(Int(value.usage*100))%"
-                self.circle?.setValue(value.usage)
-                self.circle?.setSegments([
-                    ColorValue(value.app/value.total, color: self.appColor),
-                    ColorValue(value.wired/value.total, color: self.wiredColor),
-                    ColorValue(value.compressed/value.total, color: self.compressedColor)
-                ])
-                self.circle?.setNonActiveSegmentColor(self.freeColor)
-                
-                self.level?.setActiveSegment(value.pressure.value.number())
-                self.level?.toolTip = "\(localizedString("Memory pressure")): \(value.pressure.value.rawValue)"
-                
-                self.initialized = true
-            }
-            self.chart?.addValue(value.usage)
-        })
+    private func renderLoad(_ value: RAM_Usage) {
+        self.appField?.stringValue = Units(bytes: Int64(value.app)).getReadableMemory(style: .memory)
+        self.inactiveField?.stringValue = Units(bytes: Int64(value.inactive)).getReadableMemory(style: .memory)
+        self.wiredField?.stringValue = Units(bytes: Int64(value.wired)).getReadableMemory(style: .memory)
+        self.compressedField?.stringValue = Units(bytes: Int64(value.compressed)).getReadableMemory(style: .memory)
+        self.swapField?.stringValue = Units(bytes: Int64(value.swap.used)).getReadableMemory(style: .memory)
+        
+        self.usedField?.stringValue = Units(bytes: Int64(value.used)).getReadableMemory(style: .memory)
+        self.freeField?.stringValue = Units(bytes: Int64(value.free)).getReadableMemory(style: .memory)
+        
+        let values = [
+            ColorValue(value.app/value.total, color: self.appColor),
+            ColorValue(value.wired/value.total, color: self.wiredColor),
+            ColorValue(value.compressed/value.total, color: self.compressedColor)
+        ]
+        
+        self.circle?.toolTip = "\(localizedString("Memory usage")): \(Int(value.usage*100))%"
+        self.circle?.setValue(value.usage)
+        self.circle?.setSegments(values)
+        self.circle?.setNonActiveSegmentColor(self.freeColor)
+        self.circle?.display()
+        
+        self.level?.setActiveSegment(value.pressure.value.number())
+        self.level?.setTitle(localizedString(value.pressure.value.rawValue.capitalized))
+        self.level?.toolTip = "\(localizedString("Memory pressure")): \(value.pressure.value.rawValue)"
+        self.level?.display()
+        
+        self.bar.setValues(values)
+        
+        self.chart?.display()
     }
     
     public func processCallback(_ list: [TopProcess]) {
@@ -298,22 +307,22 @@ internal class Popup: PopupWrapper {
         ]))
         
         view.addArrangedSubview(PreferencesSection([
-            PreferencesRow(localizedString("App color"), component: selectView(
+            PreferencesRow(localizedString("App color"), component: colorSelectView(
                 action: #selector(toggleAppColor),
                 items: SColor.allColors,
                 selected: self.appColorState.key
             )),
-            PreferencesRow(localizedString("Wired color"), component: selectView(
+            PreferencesRow(localizedString("Wired color"), component: colorSelectView(
                 action: #selector(toggleWiredColor),
                 items: SColor.allColors,
                 selected: self.wiredColorState.key
             )),
-            PreferencesRow(localizedString("Compressed color"), component: selectView(
+            PreferencesRow(localizedString("Compressed color"), component: colorSelectView(
                 action: #selector(toggleCompressedColor),
                 items: SColor.allColors,
                 selected: self.compressedColorState.key
             )),
-            PreferencesRow(localizedString("Free color"), component: selectView(
+            PreferencesRow(localizedString("Free color"), component: colorSelectView(
                 action: #selector(toggleFreeColor),
                 items: SColor.allColors,
                 selected: self.freeColorState.key
@@ -326,7 +335,7 @@ internal class Popup: PopupWrapper {
             initialValue: "\(Int(self.lineChartFixedScale * 100)) %"
         )
         self.chartPrefSection = PreferencesSection([
-            PreferencesRow(localizedString("Chart color"), component: selectView(
+            PreferencesRow(localizedString("Chart color"), component: colorSelectView(
                 action: #selector(self.toggleChartColor),
                 items: SColor.allColors,
                 selected: self.chartColorState.key
@@ -350,58 +359,43 @@ internal class Popup: PopupWrapper {
     }
     
     @objc private func toggleAppColor(_ sender: NSMenuItem) {
-        guard let key = sender.representedObject as? String,
-              let newValue = SColor.allColors.first(where: { $0.key == key }) else {
-            return
-        }
-        self.appColorState = newValue
-        Store.shared.set(key: "\(self.title)_appColor", value: key)
-        if let color = newValue.additional as? NSColor {
+        guard let key = sender.representedObject as? String else { return }
+        self.appColorState = SColor.fromString(key, defaultValue: self.appColorState)
+        Store.shared.set(key: "\(self.title)_appColor", value: self.appColorState.key)
+        if let color = self.appColorState.additional as? NSColor {
             self.appColorView?.layer?.backgroundColor = color.cgColor
         }
     }
     @objc private func toggleWiredColor(_ sender: NSMenuItem) {
-        guard let key = sender.representedObject as? String,
-              let newValue = SColor.allColors.first(where: { $0.key == key }) else {
-            return
-        }
-        self.wiredColorState = newValue
-        Store.shared.set(key: "\(self.title)_wiredColor", value: key)
-        if let color = newValue.additional as? NSColor {
+        guard let key = sender.representedObject as? String else { return }
+        self.wiredColorState = SColor.fromString(key, defaultValue: self.wiredColorState)
+        Store.shared.set(key: "\(self.title)_wiredColor", value: self.wiredColorState.key)
+        if let color = self.wiredColorState.additional as? NSColor {
             self.wiredColorView?.layer?.backgroundColor = color.cgColor
         }
     }
     @objc private func toggleCompressedColor(_ sender: NSMenuItem) {
-        guard let key = sender.representedObject as? String,
-              let newValue = SColor.allColors.first(where: { $0.key == key }) else {
-            return
-        }
-        self.compressedColorState = newValue
-        Store.shared.set(key: "\(self.title)_compressedColor", value: key)
-        if let color = newValue.additional as? NSColor {
+        guard let key = sender.representedObject as? String else { return }
+        self.compressedColorState = SColor.fromString(key, defaultValue: self.compressedColorState)
+        Store.shared.set(key: "\(self.title)_compressedColor", value: self.compressedColorState.key)
+        if let color = self.compressedColorState.additional as? NSColor {
             self.compressedColorView?.layer?.backgroundColor = color.cgColor
         }
     }
     @objc private func toggleFreeColor(_ sender: NSMenuItem) {
-        guard let key = sender.representedObject as? String,
-              let newValue = SColor.allColors.first(where: { $0.key == key }) else {
-            return
-        }
-        self.freeColorState = newValue
-        Store.shared.set(key: "\(self.title)_freeColor", value: key)
-        if let color = newValue.additional as? NSColor {
+        guard let key = sender.representedObject as? String else { return }
+        self.freeColorState = SColor.fromString(key, defaultValue: self.freeColorState)
+        Store.shared.set(key: "\(self.title)_freeColor", value: self.freeColorState.key)
+        if let color = self.freeColorState.additional as? NSColor {
             self.freeColorView?.layer?.backgroundColor = color.cgColor
         }
     }
     @objc private func toggleChartColor(_ sender: NSMenuItem) {
-        guard let key = sender.representedObject as? String,
-              let newValue = SColor.allColors.first(where: { $0.key == key }) else {
-            return
-        }
-        self.chartColorState = newValue
-        Store.shared.set(key: "\(self.title)_chartColor", value: key)
-        if let color = newValue.additional as? NSColor {
-            self.chart?.color = color
+        guard let key = sender.representedObject as? String else { return }
+        self.chartColorState = SColor.fromString(key, defaultValue: self.chartColorState)
+        Store.shared.set(key: "\(self.title)_chartColor", value: self.chartColorState.key)
+        if let color = self.chartColorState.additional as? NSColor {
+            self.chart?.setColor(color)
         }
     }
     @objc private func toggleLineChartHistory(_ sender: NSMenuItem) {

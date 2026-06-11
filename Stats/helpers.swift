@@ -37,18 +37,37 @@ extension AppDelegate {
         if let mountIndex = args.firstIndex(of: "--mount-path") {
             if args.indices.contains(mountIndex+1) {
                 let mountPath = args[mountIndex+1]
-                asyncShell("/usr/bin/hdiutil detach \(mountPath)")
-                asyncShell("/bin/rm -rf \(mountPath)")
-                
-                debug("DMG was unmounted and mountPath deleted")
+                let tmp = NSTemporaryDirectory()
+                let stdTmp = (tmp as NSString).standardizingPath
+                let stdMount = (mountPath as NSString).standardizingPath
+                let inTmp = stdMount.hasPrefix(stdTmp) || stdMount.hasPrefix("/private/tmp/") || stdMount.hasPrefix("/tmp/")
+                if inTmp, !stdMount.contains("..") {
+                    let detach = Process()
+                    detach.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
+                    detach.arguments = ["detach", mountPath, "-force"]
+                    try? detach.run()
+                    detach.waitUntilExit()
+                    try? FileManager.default.removeItem(atPath: mountPath)
+                    
+                    debug("DMG was unmounted and mountPath deleted")
+                } else {
+                    debug("rejected --mount-path outside tmp: \(mountPath)")
+                }
             }
         }
         
         if let dmgIndex = args.firstIndex(of: "--dmg-path") {
             if args.indices.contains(dmgIndex+1) {
-                asyncShell("/bin/rm -rf \(args[dmgIndex+1])")
-                
-                debug("DMG was deleted")
+                let dmgPath = args[dmgIndex+1]
+                let stdDmg = (dmgPath as NSString).standardizingPath
+                let downloads = (try? FileManager.default.url(for: .downloadsDirectory, in: .userDomainMask, appropriateFor: nil, create: false).path) ?? ""
+                let inDownloads = downloads.isEmpty || stdDmg.hasPrefix(downloads)
+                if stdDmg.hasSuffix(".dmg"), !stdDmg.contains(".."), inDownloads {
+                    try? FileManager.default.removeItem(atPath: dmgPath)
+                    debug("DMG was deleted")
+                } else {
+                    debug("rejected --dmg-path: \(dmgPath)")
+                }
             }
         }
     }
@@ -139,8 +158,9 @@ extension AppDelegate {
         
         debug("showing the setup window")
         
-        self.setupWindow.show()
-        self.setupWindow.finishHandler = {
+        let window = self.ensureSetupWindow()
+        window.show()
+        window.finishHandler = {
             debug("setup is finished, starting the app")
             completion()
         }
@@ -180,37 +200,45 @@ extension AppDelegate {
             
             let center = UNUserNotificationCenter.current()
             center.getNotificationSettings { settings in
-                switch settings.authorizationStatus {
-                case .authorized, .provisional:
-                    self.showUpdateNotification(version: version)
-                case .denied:
-                    self.showUpdateWindow(version: version)
-                case .notDetermined:
-                    center.requestAuthorization(options: [.sound, .alert, .badge], completionHandler: { (_, error) in
-                        if error == nil {
-                            NSApplication.shared.registerForRemoteNotifications()
-                            self.showUpdateNotification(version: version)
-                        } else {
-                            self.showUpdateWindow(version: version)
-                        }
-                    })
-                @unknown default:
-                    self.showUpdateWindow(version: version)
-                    error_msg("unknown notification setting")
+                DispatchQueue.main.async {
+                    switch settings.authorizationStatus {
+                    case .authorized, .provisional:
+                        self.showUpdateNotification(version: version)
+                    case .denied:
+                        self.showUpdateWindow(version: version)
+                    case .notDetermined:
+                        center.requestAuthorization(options: [.sound, .alert, .badge], completionHandler: { (_, error) in
+                            DispatchQueue.main.async {
+                                if error == nil {
+                                    NSApplication.shared.registerForRemoteNotifications()
+                                    self.showUpdateNotification(version: version)
+                                } else {
+                                    self.showUpdateWindow(version: version)
+                                }
+                            }
+                        })
+                    @unknown default:
+                        self.showUpdateWindow(version: version)
+                        error_msg("unknown notification setting")
+                    }
                 }
             }
         }
     }
     
-    func checkIfShouldShowSupportWindow() {
+    public func checkIfShouldShowSupportWindow() {
         if !Store.shared.exist(key: "setupProcess") || !Store.shared.exist(key: "runAtLoginInitialized") {
             return
+        }
+        if SystemStats.shared.auth.hasCredentials() {
+            guard let plan = SystemStats.shared.plan else { return }
+            if plan != .free { return }
         }
         
         let now = Int(Date().timeIntervalSince1970)
         if !Store.shared.exist(key: "support_ts") {
             Store.shared.set(key: "support_ts", value: now)
-            self.supportWindow.show()
+            self.ensureSupportWindow().show()
             return
         }
         
@@ -222,7 +250,7 @@ extension AppDelegate {
         }
         
         Store.shared.set(key: "support_ts", value: now)
-        self.supportWindow.show()
+        self.ensureSupportWindow().show()
     }
     
     private func showUpdateNotification(version: version_s) {
@@ -239,7 +267,7 @@ extension AppDelegate {
         debug("show update window")
         
         DispatchQueue.main.async(execute: {
-            self.updateWindow.open(version)
+            self.ensureUpdateWindow().open(version)
         })
     }
     
