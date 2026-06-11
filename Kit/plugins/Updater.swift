@@ -37,13 +37,13 @@ internal struct Version {
 
 public class Updater {
     private let github: URL
-    private let server: URL
-    
+    private let server: URL?
+
     private let appName: String = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as! String
     private let currentVersion: String = "v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as! String)"
-    
+
     private var observation: NSKeyValueObservation?
-    
+
     private var lastCheckTS: Int {
         get {
             return Store.shared.int(key: "updater_check_ts", defaultValue: -1)
@@ -60,10 +60,14 @@ public class Updater {
             Store.shared.set(key: "updater_install_ts", value: newValue)
         }
     }
-    
-    public init(github: String, url: String) {
+
+    public init(github: String, url: String? = nil) {
         self.github = URL(string: "https://api.github.com/repos/\(github)/releases/latest")!
-        self.server = URL(string: "\(url)?macOS=\(ProcessInfo().operatingSystemVersion.getFullVersion())")!
+        if let url = url {
+            self.server = URL(string: "\(url)?macOS=\(ProcessInfo().operatingSystemVersion.getFullVersion())")
+        } else {
+            self.server = nil
+        }
     }
     
     deinit {
@@ -85,25 +89,31 @@ public class Updater {
         defer {
             self.lastCheckTS = Int(Date().timeIntervalSince1970)
         }
-        
-        self.fetchRelease(uri: self.server) { (result, err) in
+
+        let onGithubResult: ((tag: String, url: String)?, Error?) -> Void = { result, err in
             guard let result = result, err == nil else {
-                self.fetchRelease(uri: self.github) { (result, err) in
-                    guard let result = result, err == nil else {
-                        completion(nil, err)
-                        return
-                    }
-                    
-                    completion(version_s(
-                        current: self.currentVersion,
-                        latest: result.tag,
-                        newest: isNewestVersion(currentVersion: self.currentVersion, latestVersion: result.tag),
-                        url: result.url
-                    ), nil)
-                }
+                completion(nil, err)
                 return
             }
-            
+            completion(version_s(
+                current: self.currentVersion,
+                latest: result.tag,
+                newest: isNewestVersion(currentVersion: self.currentVersion, latestVersion: result.tag),
+                url: result.url
+            ), nil)
+        }
+
+        guard let server = self.server else {
+            self.fetchRelease(uri: self.github, completion: onGithubResult)
+            return
+        }
+
+        self.fetchRelease(uri: server) { (result, err) in
+            guard let result = result, err == nil else {
+                self.fetchRelease(uri: self.github, completion: onGithubResult)
+                return
+            }
+
             completion(version_s(
                 current: self.currentVersion,
                 latest: result.tag,

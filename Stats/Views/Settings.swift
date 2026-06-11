@@ -443,7 +443,7 @@ private class SidebarView: NSStackView {
     }
     
     @objc private func reportBug() {
-        NSWorkspace.shared.open(URL(string: "https://github.com/exelban/stats/issues/new?template=bug_report.md")!)
+        NSWorkspace.shared.open(URL(string: "https://github.com/solbish/stats/issues/new?template=bug_report.md")!)
     }
     
     @objc private func donate(_ sender: NSButton) {
