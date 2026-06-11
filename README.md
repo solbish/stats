@@ -31,61 +31,6 @@ xattr -cr /Applications/Stats.app
 
 Stats is supported on the released macOS version starting from macOS 12 (Monterey).
 
-## Setup & Login
-
-The Claude module supports two authentication methods. **Claude.ai Web** is the primary method with more frequent updates.
-
-### Method 1: Claude.ai Web (Recommended)
-
-This method uses browser cookies to fetch usage data directly from claude.ai.
-
-#### Step 1: Install Cookie Extractor Extension
-
-Install the "Cookies Extractor" extension for Chrome/Edge:
-
-- [Chrome Web Store](https://chrome.google.com/webstore/detail/cookies-extractor/...)
-- Or search "Cookies Extractor" in your browser's extension store
-
-#### Step 2: Get Your Cookies
-
-1. Go to [claude.ai](https://claude.ai) and log in
-2. Click the **Cookies Extractor** extension icon in your browser toolbar
-3. Click **"Copy as JSON Cookie"**
-
-#### Step 3: Import to Stats
-
-1. Open **Stats** settings (click the Stats icon in menu bar > Settings)
-2. Navigate to the **Claude** module
-3. Click **"Import from Clipboard"**
-4. You should see "Import Successful" confirmation
-
-The status will change from "Not configured" to "OK" with the last fetch time.
-
----
-
-### Method 2: Claude Code CLI (Fallback)
-
-If you use the [Claude Code CLI](https://claude.ai/code), you can import tokens from your Keychain.
-
-#### Prerequisites
-
-1. Install Claude Code CLI: `npm install -g @anthropic-ai/claude-code`
-2. Log in: `claude login`
-
-#### Import Token
-
-1. Open Stats settings > Claude module
-2. In the **"Claude Code (fallback)"** section, click **"Import from Keychain"**
-3. Grant Keychain access if prompted
-
-> **Note:** Claude Code method has a longer default interval because API rate limits are more strict.
-
----
-
-# Claude Module for Stats
-
-Monitor your Claude AI usage directly from the macOS menu bar.
-
 ![Claude Module Preview](Modules/Claude/screenshots/preview.jpg)
 
 ## Features
