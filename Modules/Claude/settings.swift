@@ -26,6 +26,10 @@ internal class Settings: NSStackView, Settings_v {
     public var setInterval: ((_ value: Int) -> Void) = {_ in }
 
     private let title: String
+    private let instance: ClaudeInstance
+    private let webAPI: ClaudeWebAPI
+
+    private var accountsSection: PreferencesSection?
     private var authSection: PreferencesSection?
     private var webSection: PreferencesSection?
     private var codeStatusLabel: NSTextField?
@@ -33,18 +37,30 @@ internal class Settings: NSStackView, Settings_v {
     private var webStatusLabel: NSTextField?
     private var sessionKeyDisplay: NSTextField?
 
+    private let webIntervalKey: String
+    private let codeIntervalKey: String
+    private let lastFetchTimeKey: String
+    private let lastFetchErrorKey: String
+
     private var webUpdateInterval: Int {
-        get { Store.shared.int(key: "Claude_webUpdateInterval", defaultValue: 60) }
-        set { Store.shared.set(key: "Claude_webUpdateInterval", value: newValue) }
+        get { Store.shared.int(key: self.webIntervalKey, defaultValue: 60) }
+        set { Store.shared.set(key: self.webIntervalKey, value: newValue) }
     }
 
     private var codeUpdateInterval: Int {
-        get { Store.shared.int(key: "Claude_codeUpdateInterval", defaultValue: 300) }
-        set { Store.shared.set(key: "Claude_codeUpdateInterval", value: newValue) }
+        get { Store.shared.int(key: self.codeIntervalKey, defaultValue: 300) }
+        set { Store.shared.set(key: self.codeIntervalKey, value: newValue) }
     }
 
-    public init(_ module: ModuleType) {
+    public init(_ module: ModuleType, instance: ClaudeInstance, webAPI: ClaudeWebAPI) {
         self.title = module.stringValue
+        self.instance = instance
+        self.webAPI = webAPI
+        let prefix = "Claude_\(instance.id)_"
+        self.webIntervalKey = prefix + "webUpdateInterval"
+        self.codeIntervalKey = prefix + "codeUpdateInterval"
+        self.lastFetchTimeKey = prefix + "lastFetchTime"
+        self.lastFetchErrorKey = prefix + "lastFetchError"
 
         super.init(frame: NSRect.zero)
 
@@ -55,6 +71,12 @@ internal class Settings: NSStackView, Settings_v {
             self,
             selector: #selector(self.authStateChanged),
             name: .claudeAuthStateChanged,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(self.instancesChanged),
+            name: .claudeInstancesChanged,
             object: nil
         )
     }
@@ -70,11 +92,114 @@ internal class Settings: NSStackView, Settings_v {
     public func load(widgets: [widget_t]) {
         self.subviews.forEach { $0.removeFromSuperview() }
 
+        // Account management
+        self.addAccountsSection()
+
         // Web API section FIRST (primary method)
         self.addWebAuthSection()
 
         // Claude Code section SECOND (fallback method)
         self.addClaudeCodeSection()
+    }
+
+    // MARK: - Accounts (per-instance management)
+
+    private func addAccountsSection() {
+        let instances = ClaudeInstanceRegistry.shared.instances
+
+        var rows: [PreferencesRow] = []
+        for inst in instances {
+            let row = self.makeAccountRow(for: inst)
+            rows.append(PreferencesRow(component: row))
+        }
+
+        let addBtn = buttonView(#selector(self.addAccount), text: "Add account")
+        rows.append(PreferencesRow(component: addBtn))
+
+        self.accountsSection = PreferencesSection(title: "Claude Accounts", rows)
+        self.addArrangedSubview(self.accountsSection!)
+    }
+
+    private func makeAccountRow(for inst: ClaudeInstance) -> NSView {
+        let container = NSStackView()
+        container.orientation = .horizontal
+        container.spacing = 8
+        container.translatesAutoresizingMaskIntoConstraints = false
+
+        let isCurrent = inst.id == self.instance.id
+        let label = NSTextField(labelWithString: inst.displayName + (isCurrent ? " (this)" : ""))
+        label.font = NSFont.systemFont(ofSize: 12)
+        label.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        container.addArrangedSubview(label)
+
+        let renameBtn = NSButton(title: "Rename", target: self, action: #selector(self.renameAccount(_:)))
+        renameBtn.bezelStyle = .rounded
+        renameBtn.identifier = NSUserInterfaceItemIdentifier(rawValue: inst.id)
+        container.addArrangedSubview(renameBtn)
+
+        let deleteBtn = NSButton(title: "Delete", target: self, action: #selector(self.deleteAccount(_:)))
+        deleteBtn.bezelStyle = .rounded
+        deleteBtn.identifier = NSUserInterfaceItemIdentifier(rawValue: inst.id)
+        // Don't allow deleting the last remaining instance.
+        deleteBtn.isEnabled = ClaudeInstanceRegistry.shared.instances.count > 1
+        container.addArrangedSubview(deleteBtn)
+
+        return container
+    }
+
+    @objc private func addAccount() {
+        guard let name = promptForName(title: "New Claude account", message: "Choose a short label for this account (e.g. 'work', 'personal')", initial: "") else { return }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        ClaudeInstanceRegistry.shared.add(displayName: trimmed)
+    }
+
+    @objc private func renameAccount(_ sender: NSButton) {
+        guard let id = sender.identifier?.rawValue,
+              let inst = ClaudeInstanceRegistry.shared.instances.first(where: { $0.id == id }) else { return }
+        guard let name = promptForName(title: "Rename Claude account", message: "Pick a new label for \"\(inst.displayName)\"", initial: inst.displayName) else { return }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed != inst.displayName else { return }
+        ClaudeInstanceRegistry.shared.rename(id: id, to: trimmed)
+    }
+
+    @objc private func deleteAccount(_ sender: NSButton) {
+        guard let id = sender.identifier?.rawValue,
+              let inst = ClaudeInstanceRegistry.shared.instances.first(where: { $0.id == id }) else { return }
+        let alert = NSAlert()
+        alert.messageText = "Delete \"\(inst.displayName)\"?"
+        alert.informativeText = "This removes the account from the sidebar and clears its saved credentials. Claude Code (Keychain) fallback is shared and not affected."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Delete")
+        alert.addButton(withTitle: "Cancel")
+        if alert.runModal() == .alertFirstButtonReturn {
+            ClaudeInstanceRegistry.shared.remove(id: id)
+        }
+    }
+
+    private func promptForName(title: String, message: String, initial: String) -> String? {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Cancel")
+
+        let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 22))
+        input.stringValue = initial
+        alert.accessoryView = input
+        alert.window.initialFirstResponder = input
+
+        let response = alert.runModal()
+        guard response == .alertFirstButtonReturn else { return nil }
+        return input.stringValue
+    }
+
+    @objc private func instancesChanged() {
+        DispatchQueue.main.async { [weak self] in
+            // Rebuild the entire settings UI to pick up renames / additions / removals.
+            self?.load(widgets: [])
+        }
     }
 
     private func addClaudeCodeSection() {
@@ -103,13 +228,13 @@ internal class Settings: NSStackView, Settings_v {
         )
 
         // Instructions
-        let instructionsText = "Imports from Claude Code CLI Keychain.\nRequires: claude CLI installed & logged in."
+        let instructionsText = "Shared across all Claude accounts. Imports from Claude Code CLI Keychain.\nRequires: claude CLI installed & logged in."
         let instructions = NSTextField(wrappingLabelWithString: instructionsText)
         instructions.font = NSFont.systemFont(ofSize: 10)
         instructions.textColor = NSColor.secondaryLabelColor
         instructions.preferredMaxLayoutWidth = 280
 
-        self.authSection = PreferencesSection(title: "Claude Code (fallback)", [
+        self.authSection = PreferencesSection(title: "Claude Code (shared fallback)", [
             PreferencesRow("Status", component: self.codeStatusLabel!),
             PreferencesRow(component: importBtn),
             PreferencesRow(component: clearBtn),
@@ -194,18 +319,18 @@ internal class Settings: NSStackView, Settings_v {
     }
 
     private func getWebStatusText() -> String {
-        let hasWebAuth = ClaudeWebAPI.shared.hasWebAuth
+        let hasWebAuth = self.webAPI.hasWebAuth
         if !hasWebAuth {
             return "Not configured"
         }
 
         // Check for last fetch error
-        if let error = Store.shared.string(key: "Claude_lastFetchError", defaultValue: "").nilIfEmpty {
+        if let error = Store.shared.string(key: self.lastFetchErrorKey, defaultValue: "").nilIfEmpty {
             return "Error: \(error)"
         }
 
         // Check last fetch time
-        let lastFetch = Store.shared.int(key: "Claude_lastFetchTime", defaultValue: 0)
+        let lastFetch = Store.shared.int(key: self.lastFetchTimeKey, defaultValue: 0)
         if lastFetch > 0 {
             let date = Date(timeIntervalSince1970: Double(lastFetch))
             let ago = Date().timeIntervalSince(date)
@@ -222,18 +347,18 @@ internal class Settings: NSStackView, Settings_v {
     }
 
     private func getWebStatusColor() -> NSColor {
-        let hasWebAuth = ClaudeWebAPI.shared.hasWebAuth
+        let hasWebAuth = self.webAPI.hasWebAuth
         if !hasWebAuth {
             return NSColor.systemGray
         }
-        if Store.shared.string(key: "Claude_lastFetchError", defaultValue: "").nilIfEmpty != nil {
+        if Store.shared.string(key: self.lastFetchErrorKey, defaultValue: "").nilIfEmpty != nil {
             return NSColor.systemOrange
         }
         return NSColor.systemGreen
     }
 
     private func getMaskedSessionKey() -> String {
-        let sessionKey = ClaudeWebAPI.shared.getSessionKey()
+        let sessionKey = self.webAPI.getSessionKey()
         if sessionKey.isEmpty {
             return ""
         }
@@ -243,7 +368,7 @@ internal class Settings: NSStackView, Settings_v {
     }
 
     private func getMaskedOrgId() -> String {
-        let orgId = ClaudeWebAPI.shared.getOrgId()
+        let orgId = self.webAPI.getOrgId()
         if orgId.isEmpty { return "" }
         let suffix = String(orgId.suffix(8))
         return "••••••••••••\(suffix)"
@@ -320,7 +445,7 @@ internal class Settings: NSStackView, Settings_v {
     }
 
     private func applyParsedCookies(_ result: (sessionKey: String, orgId: String)) {
-        ClaudeWebAPI.shared.setSessionToken(result.sessionKey, orgId: result.orgId)
+        self.webAPI.setSessionToken(result.sessionKey, orgId: result.orgId)
         self.sessionKeyDisplay?.stringValue = getMaskedSessionKey()
         self.orgIdField?.stringValue = result.orgId
         self.updateWebStatus()
@@ -339,10 +464,10 @@ internal class Settings: NSStackView, Settings_v {
     }
 
     @objc private func clearWebAuth() {
-        ClaudeWebAPI.shared.clearSessionToken()
-        ClaudeWebAPI.shared.clearBrowserCookies()
-        Store.shared.remove("Claude_lastFetchTime")
-        Store.shared.remove("Claude_lastFetchError")
+        self.webAPI.clearSessionToken()
+        self.webAPI.clearBrowserCookies()
+        Store.shared.remove(self.lastFetchTimeKey)
+        Store.shared.remove(self.lastFetchErrorKey)
         self.sessionKeyDisplay?.stringValue = ""
         self.orgIdField?.stringValue = ""
         self.updateWebStatus()
@@ -395,7 +520,7 @@ internal class Settings: NSStackView, Settings_v {
         guard let key = sender.representedObject as? String, let value = Int(key) else { return }
         self.codeUpdateInterval = value
         // Only update interval if Code is the active method (Web not configured)
-        if !ClaudeWebAPI.shared.hasWebAuth {
+        if !self.webAPI.hasWebAuth {
             self.setInterval(value)
         }
     }

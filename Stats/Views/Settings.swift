@@ -167,6 +167,10 @@ class SettingsWindow: NSWindow, NSWindowDelegate, NSToolbarDelegate {
         return [.flexibleSpace, .previewButton, .toggleButton]
     }
     
+    internal func refreshSidebar() {
+        self.sidebarView.setModules(modules)
+    }
+
     internal func open(module: String? = nil) {
         if !self.isVisible {
             self.setIsVisible(true)
@@ -375,6 +379,20 @@ private class SidebarView: NSStackView {
     }
     
     fileprivate func setModules(_ list: [Module]) {
+        // Remove every existing module row (everything between the Dashboard
+        // entry at index 0 and the spacer at index 1, exclusive). Anything
+        // beyond the spacer was added by a prior call to setModules and needs
+        // to be cleared so we can rebuild from scratch.
+        let arranged = self.scrollView.stackView.arrangedSubviews
+        if arranged.count > 2 {
+            for view in arranged[2..<arranged.count] {
+                if view is MenuItem {
+                    self.scrollView.stackView.removeArrangedSubview(view)
+                    view.removeFromSuperview()
+                }
+            }
+        }
+
         list.reversed().forEach { (m: Module) in
             if !m.available { return }
             let menu: NSView = MenuItem(icon: m.config.icon, title: m.config.name)

@@ -227,18 +227,21 @@ public class ClaudeSessionReader {
 }
 
 public class UsageHistory {
-    public static let shared = UsageHistory()
-    private let historyKey = "Claude_UsageHistory"
+    public let instanceId: String
+    private let historyKey: String
     private let maxSnapshots = 7 * 24 * 60  // 7 days at 1-min intervals
 
     private var _snapshots: [UsageSnapshot] = []
-    private let queue = DispatchQueue(label: "eu.exelban.claude.history")
+    private let queue: DispatchQueue
 
     public var snapshots: [UsageSnapshot] {
         queue.sync { _snapshots }
     }
 
-    init() {
+    public init(instanceId: String) {
+        self.instanceId = instanceId
+        self.historyKey = "Claude_\(instanceId)_history"
+        self.queue = DispatchQueue(label: "eu.exelban.claude.history.\(instanceId)")
         load()
     }
 
@@ -494,22 +497,43 @@ internal class UsageReader: Reader<Claude_Usage> {
     private let maxRetryCount = 5
     private let baseRetryInterval: TimeInterval = 60
 
+    private let instanceId: String
+    private let webAPI: ClaudeWebAPI
+    private let historyStore: UsageHistory
+
+    private let webIntervalKey: String
+    private let codeIntervalKey: String
+    private let lastFetchTimeKey: String
+    private let lastFetchErrorKey: String
+
     private var credentialsPath: String {
         Store.shared.string(key: "Claude_credentialsPath", defaultValue: "~/.claude/.credentials.json")
     }
 
+    public init(_ module: ModuleType, instanceId: String, webAPI: ClaudeWebAPI, history: UsageHistory, callback: @escaping (Claude_Usage?) -> Void) {
+        self.instanceId = instanceId
+        self.webAPI = webAPI
+        self.historyStore = history
+        let prefix = "Claude_\(instanceId)_"
+        self.webIntervalKey = prefix + "webUpdateInterval"
+        self.codeIntervalKey = prefix + "codeUpdateInterval"
+        self.lastFetchTimeKey = prefix + "lastFetchTime"
+        self.lastFetchErrorKey = prefix + "lastFetchError"
+        super.init(module, callback: callback)
+    }
+
     public override func setup() {
         // Use Web interval if Web is configured, otherwise Code interval
-        if ClaudeWebAPI.shared.hasWebAuth {
-            self.defaultInterval = Store.shared.int(key: "Claude_webUpdateInterval", defaultValue: 60)
+        if self.webAPI.hasWebAuth {
+            self.defaultInterval = Store.shared.int(key: self.webIntervalKey, defaultValue: 60)
         } else {
-            self.defaultInterval = Store.shared.int(key: "Claude_codeUpdateInterval", defaultValue: 300)
+            self.defaultInterval = Store.shared.int(key: self.codeIntervalKey, defaultValue: 300)
         }
     }
 
     public override func read() {
         // Priority: Web API first (faster updates), Claude Code token as fallback
-        if ClaudeWebAPI.shared.hasWebAuth {
+        if self.webAPI.hasWebAuth {
             self.fetchUsageViaWebAPI()
         } else if let credentials = self.loadCredentialsFromToken() {
             self.fetchUsageViaOAuth(credentials: credentials, isfallback: false)
@@ -523,10 +547,10 @@ internal class UsageReader: Reader<Claude_Usage> {
 
     private func fetchUsageViaWebAPI() {
         // Try session token first
-        if ClaudeWebAPI.shared.hasSessionToken {
-            ClaudeWebAPI.shared.fetchUsageWithSessionToken { [weak self] usage, error in
+        if self.webAPI.hasSessionToken {
+            self.webAPI.fetchUsageWithSessionToken { [weak self] usage, error in
                 if let usage = usage {
-                    UsageHistory.shared.add(usage)
+                    self?.historyStore.add(usage)
                     self?.callback(usage)
                     self?.storeLastFetchResult(error: nil)
                 } else {
@@ -534,10 +558,10 @@ internal class UsageReader: Reader<Claude_Usage> {
                     self?.tryOAuthFallback(webError: error)
                 }
             }
-        } else if ClaudeWebAPI.shared.hasBrowserCookies {
-            ClaudeWebAPI.shared.fetchUsageWithBrowserCookies { [weak self] usage, error in
+        } else if self.webAPI.hasBrowserCookies {
+            self.webAPI.fetchUsageWithBrowserCookies { [weak self] usage, error in
                 if let usage = usage {
-                    UsageHistory.shared.add(usage)
+                    self?.historyStore.add(usage)
                     self?.callback(usage)
                     self?.storeLastFetchResult(error: nil)
                 } else {
@@ -577,7 +601,7 @@ internal class UsageReader: Reader<Claude_Usage> {
             }
 
             if finalUsage.error == nil {
-                UsageHistory.shared.add(finalUsage)
+                self?.historyStore.add(finalUsage)
                 self?.storeLastFetchResult(error: nil)
             } else {
                 self?.storeLastFetchResult(error: finalUsage.error)
@@ -588,14 +612,14 @@ internal class UsageReader: Reader<Claude_Usage> {
     }
 
     private func storeLastFetchResult(error: String?) {
-        Store.shared.set(key: "Claude_lastFetchTime", value: Int(Date().timeIntervalSince1970))
+        Store.shared.set(key: self.lastFetchTimeKey, value: Int(Date().timeIntervalSince1970))
         if let error = error {
-            Store.shared.set(key: "Claude_lastFetchError", value: error)
+            Store.shared.set(key: self.lastFetchErrorKey, value: error)
         } else {
-            Store.shared.remove("Claude_lastFetchError")
+            Store.shared.remove(self.lastFetchErrorKey)
         }
         // Notify settings UI to update
-        NotificationCenter.default.post(name: .claudeAuthStateChanged, object: nil)
+        NotificationCenter.default.post(name: .claudeAuthStateChanged, object: nil, userInfo: ["instanceId": self.instanceId])
     }
 
     /// Load credentials from manually entered token or Keychain
