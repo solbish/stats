@@ -16,6 +16,7 @@
 		CLAUDE0000100E000001BE /* keychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = CLAUDE0000100D000001BD /* keychain.swift */; };
 		CLAUDE00001010000001C0 /* oauth.swift in Sources */ = {isa = PBXBuildFile; fileRef = CLAUDE0000100F000001BF /* oauth.swift */; };
 		CLAUDE00001012000001C2 /* webapi.swift in Sources */ = {isa = PBXBuildFile; fileRef = CLAUDE00001011000001C1 /* webapi.swift */; };
+		CLAUDE00001020000001D0 /* instances.swift in Sources */ = {isa = PBXBuildFile; fileRef = CLAUDE0000101F000001CF /* instances.swift */; };
 		CLAUDE00001014000001C4 /* config.plist in Resources */ = {isa = PBXBuildFile; fileRef = CLAUDE00001013000001C3 /* config.plist */; };
 		CLAUDE00002001000002D1 /* Kit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9A2846F72666A9CC00EC1F6D /* Kit.framework */; };
 		CLAUDE00002002000002D2 /* Claude.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CLAUDE00000001000000A1 /* Claude.framework */; };
@@ -555,6 +556,7 @@
 		CLAUDE0000100D000001BD /* keychain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = keychain.swift; sourceTree = "<group>"; };
 		CLAUDE0000100F000001BF /* oauth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = oauth.swift; sourceTree = "<group>"; };
 		CLAUDE00001011000001C1 /* webapi.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = webapi.swift; sourceTree = "<group>"; };
+		CLAUDE0000101F000001CF /* instances.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = instances.swift; sourceTree = "<group>"; };
 		CLAUDE00001013000001C3 /* config.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = config.plist; sourceTree = "<group>"; };
 		CLAUDE00001015000001C5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		0192A7ED2B017E190056F918 /* hi */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = hi; path = hi.lproj/Localizable.strings; sourceTree = "<group>"; };
@@ -976,6 +978,7 @@
 				CLAUDE0000100D000001BD /* keychain.swift */,
 				CLAUDE0000100F000001BF /* oauth.swift */,
 				CLAUDE00001011000001C1 /* webapi.swift */,
+				CLAUDE0000101F000001CF /* instances.swift */,
 				CLAUDE00001013000001C3 /* config.plist */,
 				CLAUDE00001015000001C5 /* Info.plist */,
 			);
@@ -2246,6 +2249,7 @@
 				CLAUDE0000100E000001BE /* keychain.swift in Sources */,
 				CLAUDE00001010000001C0 /* oauth.swift in Sources */,
 				CLAUDE00001012000001C2 /* webapi.swift in Sources */,
+				CLAUDE00001020000001D0 /* instances.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

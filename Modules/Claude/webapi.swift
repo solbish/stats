@@ -9,16 +9,25 @@
 import Foundation
 import Kit
 
-/// Fetches usage data from claude.ai web API using session cookies
+/// Fetches usage data from claude.ai web API using session cookies.
+/// One instance per Claude module instance; storage keys are namespaced by instance id.
 public class ClaudeWebAPI {
-    public static let shared = ClaudeWebAPI()
-
     private let baseURL = "https://claude.ai"
 
-    // Storage keys
-    private let sessionKeyKey = "Claude_sessionKey"
-    private let orgIdKey = "Claude_orgId"
-    private let browserCookiesKey = "Claude_browserCookies"
+    public let instanceId: String
+
+    // Storage keys (namespaced per instance)
+    private let sessionKeyKey: String
+    private let orgIdKey: String
+    private let browserCookiesKey: String
+
+    public init(instanceId: String) {
+        self.instanceId = instanceId
+        let prefix = "Claude_\(instanceId)_"
+        self.sessionKeyKey = prefix + "sessionKey"
+        self.orgIdKey = prefix + "orgId"
+        self.browserCookiesKey = prefix + "browserCookies"
+    }
 
     /// Check if session token auth is configured
     public var hasSessionToken: Bool {

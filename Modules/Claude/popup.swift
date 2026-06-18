@@ -38,6 +38,8 @@ internal class Popup: PopupWrapper {
     private var fiveHourResetDate: Date = Date()
     private var sevenDayResetDate: Date = Date()
 
+    private var historyStore: UsageHistory?
+
     public init(_ module: ModuleType) {
         super.init(module, frame: NSRect(x: 0, y: 0, width: Constants.Popup.width, height: 0))
 
@@ -45,6 +47,10 @@ internal class Popup: PopupWrapper {
         self.spacing = 0
 
         self.setupViews()
+    }
+
+    public func setHistoryStore(_ store: UsageHistory) {
+        self.historyStore = store
     }
 
     required init?(coder: NSCoder) {
@@ -237,7 +243,7 @@ internal class Popup: PopupWrapper {
 
     private func updateHistoryChart() {
         // Get chart data with activity indicators (API usage data)
-        let chartData = UsageHistory.shared.getChartDataWithActivity(hours: 24)
+        let chartData = self.historyStore?.getChartDataWithActivity(hours: 24) ?? []
 
         // Update chart with history data (always update, even if empty)
         self.historyChart?.points = chartData
@@ -274,7 +280,7 @@ internal class Popup: PopupWrapper {
         self.hourlyBarChart?.setValues(barValues)
 
         // Analyze and show best time
-        let peakAnalysis = UsageHistory.shared.analyzePeakHours()
+        let peakAnalysis = self.historyStore?.analyzePeakHours() ?? []
         if let bestHour = peakAnalysis.last {  // Last = lowest usage
             let formatter = DateFormatter()
             formatter.dateFormat = "ha"

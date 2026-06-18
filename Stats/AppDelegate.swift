@@ -24,6 +24,11 @@ import Claude
 import Remote
 
 let updater = Updater(github: "solbish/stats")
+
+private func claudeInstances() -> [Module] {
+    return ClaudeInstanceRegistry.shared.instances.map { Claude($0) }
+}
+
 var modules: [Module] = [
     CPU(),
     GPU(),
@@ -33,8 +38,8 @@ var modules: [Module] = [
     Network(),
     Battery(),
     Bluetooth(),
-    Clock(),
-    Claude(),
+    Clock()
+] + claudeInstances() + [
     Remote()
 ]
 
@@ -85,6 +90,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         NotificationCenter.default.addObserver(self, selector: #selector(listenForAppPause), name: .pause, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handleToggleSettings), name: .toggleSettings, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handleRemoteAuthenticated), name: .remoteAuthenticated, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(handleClaudeInstancesChanged(_:)), name: .claudeInstancesChanged, object: nil)
         
         NSEvent.addGlobalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
             self?.handleKeyEvent(event)
@@ -132,6 +138,44 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     @objc private func handleRemoteAuthenticated() {
         DispatchQueue.main.async {
             self.checkIfShouldShowSupportWindow()
+        }
+    }
+
+    @objc private func handleClaudeInstancesChanged(_ notification: Notification) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            let action = notification.userInfo?["action"] as? String
+
+            switch action {
+            case "add":
+                if let inst = notification.userInfo?["instance"] as? ClaudeInstance {
+                    let module = Claude(inst)
+                    // Insert before Remote (last module) to keep ordering stable.
+                    if let remoteIdx = modules.firstIndex(where: { $0 is Remote }) {
+                        modules.insert(module, at: remoteIdx)
+                    } else {
+                        modules.append(module)
+                    }
+                    module.mount()
+                }
+            case "remove":
+                if let inst = notification.userInfo?["instance"] as? ClaudeInstance {
+                    if let idx = modules.firstIndex(where: { ($0 as? Claude)?.instance.id == inst.id }) {
+                        modules[idx].terminate()
+                        modules.remove(at: idx)
+                    }
+                }
+            case "rename":
+                if let inst = notification.userInfo?["instance"] as? ClaudeInstance,
+                   let module = modules.first(where: { ($0 as? Claude)?.instance.id == inst.id }) {
+                    module.config.name = "Claude · \(inst.displayName)"
+                }
+            default:
+                break
+            }
+
+            // Rebuild sidebar so it reflects current module list.
+            self.settingsWindow?.refreshSidebar()
         }
     }
     

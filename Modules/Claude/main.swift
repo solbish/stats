@@ -25,6 +25,10 @@ public struct Claude_Usage: Codable {
 }
 
 public class Claude: Module {
+    public let instance: ClaudeInstance
+    private let webAPI: ClaudeWebAPI
+    private let historyStore: UsageHistory
+
     private let popupView: Popup
     private let settingsView: Settings
 
@@ -34,18 +38,35 @@ public class Claude: Module {
         self.userDefaults?.bool(forKey: "systemWidgetsUpdates_state") ?? false
     }
 
-    public init() {
-        self.settingsView = Settings(.claude)
+    /// True if this instance owns the system WidgetKit slot (first instance in registry).
+    private var ownsSystemWidget: Bool {
+        return ClaudeInstanceRegistry.shared.instances.first?.id == self.instance.id
+    }
+
+    public init(_ instance: ClaudeInstance) {
+        self.instance = instance
+        self.webAPI = ClaudeWebAPI(instanceId: instance.id)
+        self.historyStore = UsageHistory(instanceId: instance.id)
+
+        self.settingsView = Settings(.claude, instance: instance, webAPI: self.webAPI)
         self.popupView = Popup(.claude)
 
         super.init(
             moduleType: .claude,
             popup: self.popupView,
-            settings: self.settingsView
+            settings: self.settingsView,
+            displayName: "Claude · \(instance.displayName)"
         )
         guard self.available else { return }
 
-        self.usageReader = UsageReader(.claude) { [weak self] value in
+        self.popupView.setHistoryStore(self.historyStore)
+
+        self.usageReader = UsageReader(
+            .claude,
+            instanceId: instance.id,
+            webAPI: self.webAPI,
+            history: self.historyStore
+        ) { [weak self] value in
             self?.usageCallback(value)
         }
 
@@ -81,8 +102,8 @@ public class Claude: Module {
             }
         }
 
-        // Update widget - always write data so widget has something to display
-        if self.systemWidgetsUpdatesState {
+        // System WidgetKit slot: only the first instance owns it (v1).
+        if self.systemWidgetsUpdatesState && self.ownsSystemWidget {
             let widgetKind = "ClaudeWidget"
             if let blobData = try? JSONEncoder().encode(value) {
                 self.userDefaults?.set(blobData, forKey: "Claude@UsageReader")
