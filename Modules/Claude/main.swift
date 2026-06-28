@@ -24,6 +24,25 @@ public struct Claude_Usage: Codable {
     public var viaWebAPI: Bool = false  // True if data came from web API fallback
 }
 
+public enum BindingWindow: String, Codable { case fiveHour, sevenDay, both }
+
+public extension Claude_Usage {
+    var effectiveUtil: Double { max(fiveHourUtil, sevenDayUtil) }
+
+    var bindingWindow: BindingWindow {
+        if abs(fiveHourUtil - sevenDayUtil) < 0.5 { return .both }
+        return fiveHourUtil > sevenDayUtil ? .fiveHour : .sevenDay
+    }
+
+    var bindingResetsAt: Date {
+        bindingWindow == .sevenDay ? sevenDayResetsAt : fiveHourResetsAt
+    }
+
+    var sevenDayDominates: Bool {
+        sevenDayUtil >= 80 && sevenDayUtil > fiveHourUtil
+    }
+}
+
 public class Claude: Module {
     public let instance: ClaudeInstance
     private let webAPI: ClaudeWebAPI
@@ -88,15 +107,16 @@ public class Claude: Module {
         self.menuBar.widgets.filter{ $0.isActive }.forEach { (w: SWidget) in
             switch w.item {
             case let widget as Mini:
-                widget.setValue(value.fiveHourUtil / 100)
+                widget.setValue(value.effectiveUtil / 100)
             case let widget as LineChart:
-                widget.setValue(value.fiveHourUtil / 100)
+                widget.setValue(value.effectiveUtil / 100)
             case let widget as BarChart:
                 widget.setValue([[ColorValue(value.fiveHourUtil / 100)], [ColorValue(value.sevenDayUtil / 100)]])
             case let widget as PieChart:
+                let v = value.effectiveUtil / 100
                 widget.setValue([
-                    ColorValue(value.fiveHourUtil / 100, color: NSColor.systemOrange),
-                    ColorValue((100 - value.fiveHourUtil) / 100, color: NSColor.systemGreen)
+                    ColorValue(v, color: NSColor.systemOrange),
+                    ColorValue(1 - v, color: NSColor.systemGreen)
                 ])
             default: break
             }

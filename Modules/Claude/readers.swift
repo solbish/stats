@@ -490,6 +490,46 @@ public class UsageHistory {
             (hour: hour, avgUsage: usages.reduce(0, +) / Double(usages.count))
         }.sorted { $0.avgUsage > $1.avgUsage }
     }
+
+    public struct UsageForecast {
+        public let fiveHourEtaTo100: Date?
+        public let sevenDayEtaTo100: Date?
+        public let fiveHourBurnPctPerMin: Double
+        public let sevenDayBurnPctPerHour: Double
+    }
+
+    public func forecast(current: Claude_Usage) -> UsageForecast {
+        let now = current.lastUpdated
+        let snaps = self.snapshots
+
+        let sessionStart = current.fiveHourResetsAt.addingTimeInterval(-5 * 3600)
+        let sessionSnaps = snaps.filter { $0.timestamp >= sessionStart }
+        var fhBurn = 0.0; var fhEta: Date? = nil
+        if let first = sessionSnaps.first, let last = sessionSnaps.last,
+           last.timestamp > first.timestamp {
+            let minutes = last.timestamp.timeIntervalSince(first.timestamp) / 60
+            fhBurn = max(0, (last.fiveHourUtil - first.fiveHourUtil) / minutes)
+            if fhBurn > 0.01, current.fiveHourUtil < 100 {
+                fhEta = now.addingTimeInterval((100 - current.fiveHourUtil) / fhBurn * 60)
+            }
+        }
+
+        let recent = snaps.filter { $0.timestamp >= now.addingTimeInterval(-24 * 3600) }
+        var sdBurn = 0.0; var sdEta: Date? = nil
+        if let first = recent.first, let last = recent.last,
+           last.timestamp > first.timestamp {
+            let hours = last.timestamp.timeIntervalSince(first.timestamp) / 3600
+            sdBurn = max(0, (last.sevenDayUtil - first.sevenDayUtil) / hours)
+            if sdBurn > 0.05, current.sevenDayUtil < 100 {
+                sdEta = now.addingTimeInterval((100 - current.sevenDayUtil) / sdBurn * 3600)
+            }
+        }
+
+        return UsageForecast(
+            fiveHourEtaTo100: fhEta, sevenDayEtaTo100: sdEta,
+            fiveHourBurnPctPerMin: fhBurn, sevenDayBurnPctPerHour: sdBurn
+        )
+    }
 }
 
 internal class UsageReader: Reader<Claude_Usage> {

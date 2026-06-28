@@ -29,6 +29,10 @@ internal class Popup: PopupWrapper {
     private var errorLabel: NSTextField? = nil
     private var peakLabel: NSTextField? = nil
     private var peakTimeLabel: NSTextField? = nil
+    private var bindingLabel: NSTextField? = nil
+    private var bindingTimeLabel: NSTextField? = nil
+
+    private var lastUsage: Claude_Usage?
 
     private var historyChart: ClaudeHistoryChartView? = nil
     private var hourlyBarChart: ColumnChartView? = nil
@@ -123,19 +127,30 @@ internal class Popup: PopupWrapper {
         // self.addArrangedSubview(barSection)
 
         // Status section
-        let statusSection = self.createSection(title: "Status", height: Constants.Popup.separatorHeight + rowHeight * 3)
-        self.tierLabel = self.createLabel(frame: NSRect(x: Constants.Popup.margins, y: statusSection.frame.height - Constants.Popup.separatorHeight - rowHeight, width: (Constants.Popup.width - Constants.Popup.margins * 2) / 2, height: 16), alignment: .left)
-        self.lastUpdatedLabel = self.createLabel(frame: NSRect(x: Constants.Popup.width / 2, y: statusSection.frame.height - Constants.Popup.separatorHeight - rowHeight, width: (Constants.Popup.width - Constants.Popup.margins * 2) / 2, height: 16), alignment: .right)
+        let statusSection = self.createSection(title: "Status", height: Constants.Popup.separatorHeight + rowHeight * 4)
+
+        // Binding limit row (top of section)
+        self.bindingLabel = self.createLabel(frame: NSRect(x: Constants.Popup.margins, y: statusSection.frame.height - Constants.Popup.separatorHeight - rowHeight, width: (Constants.Popup.width - Constants.Popup.margins * 2) / 2, height: 16), alignment: .left)
+        self.bindingLabel?.stringValue = "—"
+        self.bindingLabel?.textColor = .secondaryLabelColor
+        self.bindingTimeLabel = self.createLabel(frame: NSRect(x: Constants.Popup.width / 2, y: statusSection.frame.height - Constants.Popup.separatorHeight - rowHeight, width: (Constants.Popup.width - Constants.Popup.margins * 2) / 2, height: 16), alignment: .right)
+        self.bindingTimeLabel?.textColor = .secondaryLabelColor
+
+        // Tier / last-updated row
+        self.tierLabel = self.createLabel(frame: NSRect(x: Constants.Popup.margins, y: statusSection.frame.height - Constants.Popup.separatorHeight - rowHeight * 2, width: (Constants.Popup.width - Constants.Popup.margins * 2) / 2, height: 16), alignment: .left)
+        self.lastUpdatedLabel = self.createLabel(frame: NSRect(x: Constants.Popup.width / 2, y: statusSection.frame.height - Constants.Popup.separatorHeight - rowHeight * 2, width: (Constants.Popup.width - Constants.Popup.margins * 2) / 2, height: 16), alignment: .right)
         self.lastUpdatedLabel?.textColor = .secondaryLabelColor
 
         // Peak hours row
-        self.peakLabel = self.createLabel(frame: NSRect(x: Constants.Popup.margins, y: statusSection.frame.height - Constants.Popup.separatorHeight - rowHeight * 2, width: (Constants.Popup.width - Constants.Popup.margins * 2) / 2, height: 16), alignment: .left)
-        self.peakTimeLabel = self.createLabel(frame: NSRect(x: Constants.Popup.width / 2, y: statusSection.frame.height - Constants.Popup.separatorHeight - rowHeight * 2, width: (Constants.Popup.width - Constants.Popup.margins * 2) / 2, height: 16), alignment: .right)
+        self.peakLabel = self.createLabel(frame: NSRect(x: Constants.Popup.margins, y: statusSection.frame.height - Constants.Popup.separatorHeight - rowHeight * 3, width: (Constants.Popup.width - Constants.Popup.margins * 2) / 2, height: 16), alignment: .left)
+        self.peakTimeLabel = self.createLabel(frame: NSRect(x: Constants.Popup.width / 2, y: statusSection.frame.height - Constants.Popup.separatorHeight - rowHeight * 3, width: (Constants.Popup.width - Constants.Popup.margins * 2) / 2, height: 16), alignment: .right)
         self.peakTimeLabel?.textColor = .secondaryLabelColor
 
         self.errorLabel = self.createLabel(frame: NSRect(x: Constants.Popup.margins, y: 8, width: Constants.Popup.width - Constants.Popup.margins * 2, height: 16), alignment: .center)
         self.errorLabel?.textColor = .systemRed
         self.errorLabel?.isHidden = true
+        statusSection.addSubview(self.bindingLabel!)
+        statusSection.addSubview(self.bindingTimeLabel!)
         statusSection.addSubview(self.tierLabel!)
         statusSection.addSubview(self.lastUpdatedLabel!)
         statusSection.addSubview(self.peakLabel!)
@@ -197,6 +212,7 @@ internal class Popup: PopupWrapper {
     public func usageCallback(_ value: Claude_Usage) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
+            self.lastUsage = value
 
             // 5-hour usage
             self.fiveHourBar?.doubleValue = value.fiveHourUtil
@@ -344,6 +360,26 @@ internal class Popup: PopupWrapper {
         self.peakLabel?.stringValue = peakStatus.isPeak ? "PEAK" : "off-peak"
         self.peakLabel?.textColor = peakStatus.isPeak ? .systemOrange : .systemGreen
         self.peakTimeLabel?.stringValue = peakStatus.timeUntilChange
+
+        // Binding limit row
+        if let usage = self.lastUsage {
+            let isSevenDay = usage.sevenDayDominates
+            self.bindingLabel?.stringValue = isSevenDay
+                ? String(format: "Limited by weekly (%.0f%%)", usage.sevenDayUtil)
+                : String(format: "Limited by 5h (%.0f%%)", usage.fiveHourUtil)
+            self.bindingLabel?.textColor = isSevenDay ? .systemRed : .secondaryLabelColor
+
+            let resetsAt = isSevenDay ? usage.sevenDayResetsAt : usage.fiveHourResetsAt
+            let remaining = resetsAt.timeIntervalSince(now)
+            self.bindingTimeLabel?.stringValue = remaining > 0
+                ? "resets in \(formatTimeInterval(remaining))"
+                : "resetting…"
+            self.bindingTimeLabel?.textColor = isSevenDay ? .systemRed : .secondaryLabelColor
+
+            if isSevenDay {
+                self.peakLabel?.textColor = .systemRed
+            }
+        }
     }
 
     /// Calculate peak hours status
