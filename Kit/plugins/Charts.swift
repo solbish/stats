@@ -138,18 +138,18 @@ public class ChartView: NSView {
     }
     
     fileprivate func displayIfVisible() {
-        if Thread.isMainThread {
-            if self.window?.isVisible ?? false { self.display() }
-        } else {
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                if self.window?.isVisible ?? false { self.display() }
-            }
+        self.onMain { [weak self] in
+            guard let self, self.window?.isVisible ?? false else { return }
+            self.needsDisplay = true
         }
     }
     
     public func setAnimation(_ enabled: Bool) {
         self.write { self.animationEnabled = enabled }
+    }
+    
+    fileprivate var animationsAllowed: Bool {
+        self.read { self.animationEnabled } && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
     }
     
     fileprivate func onMain(_ block: @escaping () -> Void) {
@@ -181,7 +181,7 @@ public class ChartView: NSView {
     fileprivate func fadeOrDisplay() {
         self.onMain { [weak self] in
             guard let self, self.window?.isVisible ?? false else { return }
-            if self.read({ self.animationEnabled }) {
+            if self.animationsAllowed {
                 self.fadeTransition()
             }
             self.needsDisplay = true
@@ -569,20 +569,20 @@ public class LineChartView: ChartView {
         }
         self.onMain { [weak self] in
             guard let self, self.window?.isVisible ?? false else { return }
-            let state = self.read { (n: self.points.count, animate: self.animationEnabled, yLegend: self.yLegend) }
-            if state.animate, !self.stop, state.n > 1 {
-                let now = CACurrentMediaTime()
-                let dt = self.lastSlideAt == 0 ? self.animationDuration : now - self.lastSlideAt
-                self.lastSlideAt = now
-                let chartWidth = self.bounds.width - (state.yLegend ? 30 : 0)
-                CATransaction.begin()
-                CATransaction.setDisableActions(true)
-                self.slideTransition(chartWidth / CGFloat(state.n - 1), duration: min(max(dt, 0.1), 3.0))
-                self.display()
-                CATransaction.commit()
-            } else {
-                self.display()
+            let state = self.read { (n: self.points.count, yLegend: self.yLegend) }
+            let dx = state.n > 1 ? (self.bounds.width - (state.yLegend ? 30 : 0)) / CGFloat(state.n - 1) : 0
+            guard dx >= 1, !self.stop, self.animationsAllowed else {
+                self.needsDisplay = true
+                return
             }
+            let now = CACurrentMediaTime()
+            let dt = self.lastSlideAt == 0 ? self.animationDuration : now - self.lastSlideAt
+            self.lastSlideAt = now
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            self.slideTransition(dx, duration: min(max(dt, 0.1), 1.0))
+            self.display()
+            CATransaction.commit()
         }
     }
     
@@ -748,6 +748,7 @@ public class LineChartView: ChartView {
 
 public class NetworkChartView: ChartView {
     private var base: DataSizeBase = .byte
+    private var speedUnit: String = NetworkSpeedUnitAuto
     
     private var reversedOrder: Bool
     
@@ -785,7 +786,8 @@ public class NetworkChartView: ChartView {
         
         let tooltip: (DoubleValue) -> String = { [weak self] v in
             let base: DataSizeBase = self?.read { self?.base ?? .byte } ?? .byte
-            return Units(bytes: Int64(v.value)).getReadableSpeed(base: base)
+            let speedUnit: String = self?.read { self?.speedUnit ?? NetworkSpeedUnitAuto } ?? NetworkSpeedUnitAuto
+            return Units(bytes: Int64(v.value)).getReadableSpeed(base: base, unit: speedUnit)
         }
         self.inChart.setToolTipFunc(tooltip)
         self.outChart.setToolTipFunc(tooltip)
@@ -800,6 +802,10 @@ public class NetworkChartView: ChartView {
     
     public func setBase(_ newBase: DataSizeBase) {
         self.write { self.base = newBase }
+    }
+    
+    public func setSpeedUnit(_ newUnit: String) {
+        self.write { self.speedUnit = newUnit }
     }
     
     public func addValue(upload: Double, download: Double) {
@@ -871,14 +877,15 @@ public class NetworkChartView: ChartView {
 }
 
 public class PieChartView: ChartView {
-    private var filled: Bool = false
-    private var drawValue: Bool = false
-    private var nonActiveSegmentColor: NSColor = NSColor.lightGray
+    private var filled: Bool
+    private var drawValue: Bool
+    private var lineCap: CGLineCap
+    private var segments: [ColorValue]
     
+    private var nonActiveSegmentColor: NSColor = NSColor.lightGray
     private var value: Double? = nil
     private var maxValue: Double = 1
     private var text: String? = nil
-    private var segments: [ColorValue] = []
     private var color: NSColor = NSColor.systemBlue
     
     public init(
@@ -886,11 +893,13 @@ public class PieChartView: ChartView {
         segments: [ColorValue] = [],
         filled: Bool = false,
         drawValue: Bool = false,
-        animation: Bool = true
+        animation: Bool = true,
+        lineCap: CGLineCap = .round
     ) {
         self.filled = filled
         self.drawValue = drawValue
         self.segments = segments
+        self.lineCap = lineCap
         
         super.init(frame: frame, queueLabel: "eu.exelban.Stats.Charts.Pie")
         self.animationEnabled = animation
@@ -910,6 +919,7 @@ public class PieChartView: ChartView {
         var text: String? = nil
         var segments: [ColorValue] = []
         var color: NSColor = NSColor.systemBlue
+        var lineCap: CGLineCap = .butt
         self.read {
             filled = self.filled
             drawValue = self.drawValue
@@ -918,6 +928,7 @@ public class PieChartView: ChartView {
             text = self.text
             segments = self.segments
             color = self.color
+            lineCap = self.lineCap
         }
         
         let arcWidth: CGFloat = filled ? min(self.frame.width, self.frame.height) / 2 : 7
@@ -938,7 +949,7 @@ public class PieChartView: ChartView {
         context.setShouldAntialias(true)
         
         context.setLineWidth(arcWidth)
-        context.setLineCap(.butt)
+        context.setLineCap(lineCap)
         
         let startAngle: CGFloat = CGFloat.pi/2
         var previousAngle = startAngle
@@ -1136,7 +1147,8 @@ public class GaugeChartView: ChartView {
         }
         
         context.setLineWidth(arcWidth)
-        context.setLineCap(.butt)
+        context.setLineCap(.round)
+        
         for i in 0..<segments.count {
             if let color = segments[i].color {
                 context.setStrokeColor(color.cgColor)

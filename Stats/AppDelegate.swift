@@ -91,6 +91,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         NotificationCenter.default.addObserver(self, selector: #selector(handleToggleSettings), name: .toggleSettings, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handleRemoteAuthenticated), name: .remoteAuthenticated, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handleClaudeInstancesChanged(_:)), name: .claudeInstancesChanged, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(handleRemoteUpdate), name: .remoteUpdate, object: nil)
         
         NSEvent.addGlobalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
             self?.handleKeyEvent(event)
@@ -176,6 +177,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 
             // Rebuild sidebar so it reflects current module list.
             self.settingsWindow?.refreshSidebar()
+        }
+    }
+    
+    @objc private func handleRemoteUpdate() {
+        DispatchQueue.main.async {
+            self.checkForNewVersion(silent: true)
         }
     }
     

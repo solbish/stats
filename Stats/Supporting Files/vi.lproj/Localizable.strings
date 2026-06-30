@@ -59,7 +59,6 @@
 "Center alignment" = "Căn giữa";
 "Right alignment" = "Căn phải";
 "Dashboard" = "Bảng điều khiển";
-"Enabled" = "Đã bật";
 "Disabled" = "Đã tắt";
 "Silent" = "Im lặng";
 "Units" = "Đơn vị";
@@ -83,8 +82,6 @@
 "2 minutes" = "2 phút";
 "3 minutes" = "3 phút";
 "10 minutes" = "10 phút";
-"Import" = "Nhập";
-"Export" = "Xuất";
 "Separator" = "Phân cách";
 "Read" = "Đọc";
 "Write" = "Ghi";
@@ -120,9 +117,6 @@
 "Check for a new version every week (once a week)" = "Kiểm tra phiên bản mới mỗi tuần (một lần một tuần)";
 "Check for a new version every month (once a month)" = "Kiểm tra phiên bản mới mỗi tháng (một lần một tháng)";
 "Never check for updates (not recommended)" = "Không bao giờ kiểm tra cập nhật (không khuyến nghị)";
-"Anonymous telemetry for better development decisions" = "Dữ liệu ẩn danh để cải thiện quyết định phát triển";
-"Share anonymous telemetry data" = "Chia sẻ dữ liệu ẩn danh";
-"Do not share anonymous telemetry data" = "Không chia sẻ dữ liệu ẩn danh";
 "The configuration is completed" = "Cấu hình đã hoàn tất";
 "finish_setup_message" = "Tất cả đã được thiết lập! \n Stats là một công cụ mã nguồn mở miễn phí và sẽ luôn như vậy. \n Nếu bạn yêu thích, hãy ủng hộ dự án, điều đó luôn được đánh giá cao!";
 
@@ -144,9 +138,9 @@
 "No notifications available in this module" = "Không có thông báo nào trong module này";
 "Open Calendar" = "Mở Lịch";
 "Toggle the module" = "Bật/tắt module";
+"Open System Stats" = "Mở System Stats"; // gemma4:31b
 
 // Application settings
-"Update application" = "Cập nhật ứng dụng";
 "Check for updates" = "Kiểm tra cập nhật";
 "At start" = "Khi khởi động";
 "Once per day" = "Một lần mỗi ngày";
@@ -165,7 +159,6 @@
 "Combined modules" = "Các module kết hợp";
 "Combined details" = "Chi tiết kết hợp";
 "Spacing" = "Khoảng cách";
-"Share anonymous telemetry" = "Chia sẻ dữ liệu ẩn danh";
 "Choose file" = "Chọn tập tin";
 "Stress tests" = "Kiểm tra áp lực";
 
@@ -197,7 +190,6 @@
 "Colorize" = "Tô màu";
 "Colorize value" = "Tô màu giá trị";
 "Additional information" = "Thông tin bổ sung";
-"Reverse values order" = "Đảo thứ tự giá trị";
 "Base" = "Cơ sở";
 "Display mode" = "Chế độ hiển thị";
 "One row" = "Một hàng";
@@ -231,7 +223,6 @@
 
 // Module Kit
 "Open module settings" = "Mở cài đặt module";
-"Select widget" = "Chọn widget %0";
 "Open widget settings" = "Mở cài đặt widget";
 "Update interval" = "Khoảng thời gian cập nhật";
 "Usage history" = "Lịch sử sử dụng";
@@ -253,7 +244,6 @@
 // Modules
 "Number of top processes" = "Số lượng tiến trình hàng đầu";
 "Update interval for top processes" = "Khoảng thời gian cập nhật cho các tiến trình hàng đầu";
-"Notification level" = "Mức độ thông báo";
 "Chart color" = "Màu biểu đồ";
 "Main chart scaling" = "Tỷ lệ biểu đồ chính";
 "Scale value" = "Giá trị tỷ lệ";
@@ -277,7 +267,6 @@
 "5 minutes" = "5 phút";
 "15 minutes" = "15 phút";
 "CPU usage threshold" = "Ngưỡng sử dụng CPU";
-"CPU usage is" = "Sử dụng CPU là %0";
 "Efficiency cores" = "Nhân tiết kiệm";
 "Performance cores" = "Nhân hiệu năng";
 "System color" = "Màu hệ thống";
@@ -300,18 +289,9 @@
 // GPU
 "GPU to show" = "GPU hiển thị";
 "Show GPU type" = "Hiển thị loại GPU";
-"GPU enabled" = "GPU đã bật";
-"GPU disabled" = "GPU đã tắt";
-"GPU temperature" = "Nhiệt độ GPU";
 "GPU utilization" = "Mức sử dụng GPU";
-"Vendor" = "Nhà cung cấp";
 "Model" = "Mô hình";
 "Status" = "Trạng thái";
-"Active" = "Hoạt động";
-"Non active" = "Không hoạt động";
-"Fan speed" = "Tốc độ quạt";
-"Core clock" = "Xung nhịp lõi";
-"Memory clock" = "Xung nhịp bộ nhớ";
 "Utilization" = "Sử dụng";
 "Render utilization" = "Mức sử dụng kết xuất";
 "Tiler utilization" = "Mức sử dụng tiler";
@@ -353,15 +333,12 @@
 "Disk usage" = "Sử dụng ổ đĩa";
 "Total read" = "Tổng dữ liệu đọc";
 "Total written" = "Tổng dữ liệu ghi";
-"Write speed" = "Tốc độ ghi";
-"Read speed" = "Tốc độ đọc";
 "Drives" = "Ổ đĩa";
 "SMART data" = "Dữ liệu SMART";
-"Power cycles" = "Power cycles";
-"Power on hours" = "Power on hours";
+"Power cycles" = "Số chu kỳ sạc"; // gemma4:31b
+"Power on hours" = "Số giờ bật nguồn"; // gemma4:31b
 
 // Sensors
-"Temperature unit" = "Đơn vị nhiệt độ";
 "Celsius" = "Độ C";
 "Fahrenheit" = "Độ F";
 "Save the fan speed" = "Lưu tốc độ quạt";
@@ -373,6 +350,12 @@
 "Show unknown sensors" = "Hiển thị các cảm biến không xác định";
 "Install fan helper" = "Cài đặt trợ lý quạt";
 "Uninstall fan helper" = "Gỡ cài đặt trợ lý quạt";
+"Approve in System Settings ▸ Login Items" = "Phê duyệt trong Cài đặt Hệ thống ▸ Mục Đăng nhập"; // gemma4:31b
+"Fan helper needs your approval" = "Trình hỗ trợ quạt cần sự chấp thuận của bạn"; // gemma4:31b
+"To control the fans, enable Stats in System Settings ▸ Login Items." = "Để điều khiển quạt, hãy bật Stats trong Cài đặt hệ thống ▸ Mục đăng nhập."; // gemma4:31b
+"Open Login Items" = "Mở Mục Đăng nhập"; // gemma4:31b
+"Could not enable the fan helper" = "Không thể kích hoạt trình hỗ trợ quạt"; // gemma4:31b
+"Open System Settings ▸ Login Items, make sure Stats is allowed in the background, then try again." = "Mở Cài đặt Hệ thống ▸ Mục Đăng nhập, đảm bảo Stats được cho phép chạy trong nền, sau đó thử lại."; // gemma4:31b
 "Fan value" = "Giá trị quạt";
 "Turn off fan" = "Tắt quạt";
 "You are going to turn off the fan. This is not recommended action that can damage your mac, are you sure you want to do that?" = "Bạn sắp tắt quạt. Đây là hành động không được khuyến nghị và có thể gây hư hại cho Mac của bạn. Bạn có chắc chắn muốn thực hiện không?";
@@ -390,11 +373,6 @@
 "Interface" = "Giao diện";
 "Physical address" = "Địa chỉ vật lý";
 "Refresh" = "Làm mới";
-"Click to copy public IP address" = "Nhấn để sao chép địa chỉ IP công khai";
-"Click to copy local IP address" = "Nhấn để sao chép địa chỉ IP nội bộ";
-"Click to copy wifi name" = "Nhấn để sao chép tên wifi";
-"Click to copy mac address" = "Nhấn để sao chép địa chỉ mac";
-"No connection" = "Không có kết nối";
 "Network interface" = "Giao diện mạng";
 "Total download" = "Tổng dữ liệu tải xuống";
 "Total upload" = "Tổng dữ liệu tải lên";
@@ -406,12 +384,9 @@
 "Standard" = "Chuẩn";
 "Security" = "Bảo mật";
 "Channel" = "Kênh";
-"Common scale" = "Thang đo chung";
 "Autodetection" = "Tự phát hiện";
 "Widget activation threshold" = "Ngưỡng kích hoạt widget";
 "Internet connection" = "Kết nối internet";
-"Active state color" = "Màu trạng thái hoạt động";
-"Nonactive state color" = "Màu trạng thái không hoạt động";
 "Connectivity host" = "Máy chủ kết nối";
 "Leave empty to disable the check" = "Để trống để tắt kiểm tra";
 "Connectivity history" = "Lịch sử kết nối";
@@ -419,11 +394,8 @@
 "Every hour" = "Mỗi giờ";
 "Every 12 hours" = "Mỗi 12 giờ";
 "Every 24 hours" = "Mỗi 24 giờ";
-"Network activity" = "Hoạt động mạng";
 "Last reset" = "Đặt lại lần cuối cách đây %0";
 "Latency" = "Độ trễ";
-"Upload speed" = "Tốc độ tải lên";
-"Download speed" = "Tốc độ tải xuống";
 "Address" = "Địa chỉ";
 "WiFi network" = "Mạng WiFi";
 "Local IP changed" = "IP nội bộ đã thay đổi";
@@ -435,7 +407,6 @@
 "Show country code instead of emoji" = "Hiển thị mã quốc gia thay vì emoji"; // gemma4:31b
 
 // Battery
-"Level" = "Mức";
 "Source" = "Nguồn";
 "AC Power" = "Nguồn AC";
 "Battery Power" = "Nguồn pin";
@@ -452,7 +423,6 @@
 "Time to charge" = "Thời gian để sạc đầy";
 "Calculating" = "Đang tính toán";
 "Fully charged" = "Đã sạc đầy";
-"Not connected" = "Chưa kết nối";
 "Low level notification" = "Thông báo pin yếu";
 "High level notification" = "Thông báo pin đầy";
 "Low battery" = "Pin yếu";
@@ -464,18 +434,16 @@
 "Time and percentage" = "Thời gian và phần trăm";
 "Time format" = "Định dạng thời gian";
 "Hide additional information when full" = "Ẩn thông tin bổ sung khi pin đầy";
-"Last charge" = "Lần sạc cuối";
-"Capacity" = "Dung lượng";
-"current / maximum / designed" = "hiện tại / tối đa / thiết kế";
-"Low power mode" = "Chế độ tiết kiệm pin";
 "Percentage inside the icon" = "Phần trăm hiển thị trong biểu tượng";
-"Colorize battery" = "Tô màu pin";
-"Charging current" = "Dòng sạc";
-"Charging Voltage" = "Điện áp sạc";
 "Charger state inside the battery" = "Trạng thái sạc bên trong pin";
+"Max capacity" = "Dung lượng tối đa"; // gemma4:31b
+"Designed capacity" = "Dung lượng thiết kế"; // gemma4:31b
+"On hold" = "Tạm dừng"; // gemma4:31b
+"On battery" = "Đang dùng pin"; // gemma4:31b
+"Plugged in" = "Đã kết nối"; // gemma4:31b
+"Charging" = "Đang sạc"; // gemma4:31b
 
 // Bluetooth
-"Battery to show" = "Hiển thị pin";
 "No Bluetooth devices are available" = "Không có thiết bị Bluetooth nào khả dụng";
 
 // Clock
@@ -488,6 +456,8 @@
 "Delete selected clock" = "Xóa đồng hồ đã chọn";
 "Help with datetime format" = "Trợ giúp về định dạng ngày giờ";
 "Sync with NTP server" = "Đồng bộ hóa với máy chủ NTP"; // gemma4:31b
+"Previous month" = "Tháng trước"; // gemma4:31b
+"Next month" = "Tháng sau"; // gemma4:31b
 
 // Colors
 "Based on utilization" = "Dựa trên mức sử dụng";
