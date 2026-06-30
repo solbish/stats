@@ -23,6 +23,7 @@ internal class Popup: PopupWrapper {
 
     private var opusLabel: NSTextField? = nil
     private var sonnetLabel: NSTextField? = nil
+    private var weekPaceLabel: NSTextField? = nil
 
     private var tierLabel: NSTextField? = nil
     private var lastUpdatedLabel: NSTextField? = nil
@@ -77,15 +78,30 @@ internal class Popup: PopupWrapper {
         fiveHourSection.addSubview(fiveHourCountdown)
         self.addArrangedSubview(fiveHourSection)
 
-        // 7-Day section
-        let sevenDaySection = self.createSection(title: "7-Day Usage")
+        // 7-Day section — has an extra row of height to fit the pace label.
+        let sevenDaySectionHeight: CGFloat = Constants.Popup.separatorHeight + rowHeight * 3 + 8
+        let sevenDaySection = self.createSection(title: "7-Day Usage", height: sevenDaySectionHeight)
         let (sevenDayBar, sevenDayLabel, sevenDayCountdown) = self.createUsageRow()
+        // Shift the standard bar/label/countdown up by rowHeight to make room
+        // for the pace line + model breakdown below them.
+        sevenDayBar.setFrameOrigin(NSPoint(x: sevenDayBar.frame.origin.x, y: sevenDayBar.frame.origin.y + rowHeight))
+        sevenDayLabel.setFrameOrigin(NSPoint(x: sevenDayLabel.frame.origin.x, y: sevenDayLabel.frame.origin.y + rowHeight))
+        sevenDayCountdown.setFrameOrigin(NSPoint(x: sevenDayCountdown.frame.origin.x, y: sevenDayCountdown.frame.origin.y + rowHeight))
         self.sevenDayBar = sevenDayBar
         self.sevenDayLabel = sevenDayLabel
         self.sevenDayCountdown = sevenDayCountdown
         sevenDaySection.addSubview(sevenDayBar)
         sevenDaySection.addSubview(sevenDayLabel)
         sevenDaySection.addSubview(sevenDayCountdown)
+
+        // Pace label — full-width centered, below the countdown.
+        self.weekPaceLabel = self.createLabel(
+            frame: NSRect(x: Constants.Popup.margins, y: rowHeight + 4, width: Constants.Popup.width - Constants.Popup.margins * 2, height: 16),
+            alignment: .center
+        )
+        self.weekPaceLabel?.stringValue = ""
+        self.weekPaceLabel?.textColor = .secondaryLabelColor
+        sevenDaySection.addSubview(self.weekPaceLabel!)
 
         // Model breakdown row
         let modelRow = NSView(frame: NSRect(x: Constants.Popup.margins, y: 8, width: Constants.Popup.width - Constants.Popup.margins * 2, height: rowHeight))
@@ -229,6 +245,20 @@ internal class Popup: PopupWrapper {
             if hasModelBreakdown {
                 self.opusLabel?.stringValue = String(format: "Opus: %.1f%%", value.opusUtil)
                 self.sonnetLabel?.stringValue = String(format: "Sonnet: %.1f%%", value.sonnetUtil)
+            }
+
+            // 7-day pace line
+            let day = value.weekDayIndex
+            switch value.weekPaceStatus {
+            case .under:
+                self.weekPaceLabel?.stringValue = String(format: "Day %d of 7 · %.0f%% under pace", day, abs(value.weekPaceDelta))
+                self.weekPaceLabel?.textColor = .systemGreen
+            case .onPace:
+                self.weekPaceLabel?.stringValue = String(format: "Day %d of 7 · on pace", day)
+                self.weekPaceLabel?.textColor = .secondaryLabelColor
+            case .over:
+                self.weekPaceLabel?.stringValue = String(format: "Day %d of 7 · %.0f%% over pace", day, value.weekPaceDelta)
+                self.weekPaceLabel?.textColor = .systemRed
             }
 
             // Tier

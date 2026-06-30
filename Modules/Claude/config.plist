@@ -22,7 +22,7 @@
 		<key>mini</key>
 		<dict>
 			<key>Default</key>
-			<true/>
+			<false/>
 			<key>Preview</key>
 			<dict>
 				<key>Value</key>
@@ -72,6 +72,13 @@
 			<false/>
 			<key>Order</key>
 			<integer>4</integer>
+		</dict>
+		<key>claude_indicator</key>
+		<dict>
+			<key>Default</key>
+			<true/>
+			<key>Order</key>
+			<integer>5</integer>
 		</dict>
 	</dict>
 	<key>Settings</key>

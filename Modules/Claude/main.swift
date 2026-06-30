@@ -26,6 +26,8 @@ public struct Claude_Usage: Codable {
 
 public enum BindingWindow: String, Codable { case fiveHour, sevenDay, both }
 
+public enum PaceStatus { case under, onPace, over }
+
 public extension Claude_Usage {
     var effectiveUtil: Double { max(fiveHourUtil, sevenDayUtil) }
 
@@ -41,6 +43,25 @@ public extension Claude_Usage {
     var sevenDayDominates: Bool {
         sevenDayUtil >= 80 && sevenDayUtil > fiveHourUtil
     }
+
+    /// Fraction of the 7-day window already elapsed (0…1).
+    var weekElapsedFraction: Double {
+        let total: TimeInterval = 7 * 24 * 3600
+        let remaining = max(0, sevenDayResetsAt.timeIntervalSince(lastUpdated))
+        return min(1, max(0, (total - remaining) / total))
+    }
+    /// Expected 7-day % if usage were perfectly linear.
+    var weekExpectedPct: Double { weekElapsedFraction * 100 }
+    /// >0 means ahead of pace (bad), <0 means under pace (good).
+    var weekPaceDelta: Double { sevenDayUtil - weekExpectedPct }
+    /// ±5 pp dead-band around the linear line to avoid color flicker.
+    var weekPaceStatus: PaceStatus {
+        if weekPaceDelta > 5 { return .over }
+        if weekPaceDelta < -5 { return .under }
+        return .onPace
+    }
+    /// Which "day of 7" we're in (1…7), for popup copy.
+    var weekDayIndex: Int { max(1, min(7, Int(weekElapsedFraction * 7) + 1)) }
 }
 
 public class Claude: Module {
@@ -118,6 +139,20 @@ public class Claude: Module {
                     ColorValue(v, color: NSColor.systemOrange),
                     ColorValue(1 - v, color: NSColor.systemGreen)
                 ])
+            case let widget as ClaudeIndicator:
+                let pace: ClaudeIndicatorPaceStatus
+                switch value.weekPaceStatus {
+                case .under:  pace = .under
+                case .onPace: pace = .onPace
+                case .over:   pace = .over
+                }
+                widget.setValue(
+                    fiveHourUtil: value.fiveHourUtil,
+                    sevenDayUtil: value.sevenDayUtil,
+                    paceStatus: pace,
+                    weekElapsedFraction: value.weekElapsedFraction,
+                    sevenDayDominates: value.sevenDayDominates
+                )
             default: break
             }
         }
