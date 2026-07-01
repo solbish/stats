@@ -134,7 +134,7 @@ public class Claude: Module {
             case let widget as BarChart:
                 widget.setValue([[ColorValue(value.fiveHourUtil / 100)], [ColorValue(value.sevenDayUtil / 100)]])
             case let widget as PieChart:
-                let v = value.effectiveUtil / 100
+                let v = value.fiveHourUtil / 100
                 widget.setValue([
                     ColorValue(v, color: NSColor.systemOrange),
                     ColorValue(1 - v, color: NSColor.systemGreen)
